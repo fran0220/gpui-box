@@ -9118,6 +9118,7 @@ dependencies = [
  "anyhow",
  "gpui-box-kit",
  "gpui-box-kit-tokens",
+ "proc-macro2",
  "pulldown-cmark",
  "quote",
  "serde",

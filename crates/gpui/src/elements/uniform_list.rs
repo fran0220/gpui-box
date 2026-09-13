@@ -510,7 +510,13 @@ impl Element for UniformList {
                                 AvailableSpace::Definite(item_height),
                             );
                             item.layout_as_root(available_space, window, cx);
-                            item.prepaint_at(item_origin, window, cx);
+                            window.with_placed_element_offset(
+                                item_origin,
+                                scroll_offset,
+                                |window| {
+                                    item.prepaint(window, cx);
+                                },
+                            );
                             frame_state.items.push(item);
                         }
 
@@ -726,6 +732,98 @@ impl InteractiveElement for UniformList {
 #[cfg(test)]
 mod test {
     use crate::TestAppContext;
+
+    #[gpui::test]
+    fn virtual_placement_separates_layout_from_scroll_and_nested_slides(cx: &mut TestAppContext) {
+        use crate::{
+            Context, Pixels, Point, Render, UniformListScrollHandle, Window, canvas, div, point,
+            prelude::*, px, size, uniform_list,
+        };
+        use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+
+        type Samples = Rc<RefCell<BTreeMap<usize, (Point<Pixels>, Point<Pixels>)>>>;
+        struct Root(UniformListScrollHandle, Samples);
+        impl Render for Root {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let samples = self.1.clone();
+                uniform_list("placed", 100, move |range, _, _| {
+                    range
+                        .map(|index| {
+                            let samples = samples.clone();
+                            div().relative().h(px(20.)).child(
+                                canvas(
+                                    move |bounds, window, _| {
+                                        let ambient = window.ambient_element_offset();
+                                        samples.borrow_mut().insert(
+                                            index,
+                                            (bounds.origin, bounds.origin - ambient),
+                                        );
+                                        let original = window.element_offset();
+                                        // A parent's animated translation remains ambient.
+                                        window.with_element_offset(
+                                            point(px(3.), px(-5.)),
+                                            |window| {
+                                                assert_eq!(
+                                                    window.ambient_element_offset(),
+                                                    ambient + point(px(3.), px(-5.))
+                                                );
+                                                let parent = window.element_offset();
+                                                let placed = parent + point(px(11.), px(37.));
+                                                window.with_placed_element_offset(
+                                                    placed,
+                                                    point(px(-2.), px(-7.)),
+                                                    |window| {
+                                                        assert_eq!(window.element_offset(), placed);
+                                                        assert_eq!(
+                                                            window.ambient_element_offset(),
+                                                            ambient + point(px(1.), px(-12.))
+                                                        );
+                                                    },
+                                                );
+                                                assert_eq!(window.element_offset(), parent);
+                                            },
+                                        );
+                                        assert_eq!(window.element_offset(), original);
+                                        assert_eq!(window.ambient_element_offset(), ambient);
+                                    },
+                                    |_, _, _, _| {},
+                                )
+                                .absolute()
+                                .size_full(),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .w(px(200.))
+                .h(px(80.))
+                .p(px(7.))
+                .track_scroll(&self.0)
+            }
+        }
+        let cx = cx.add_empty_window();
+        let scroll = UniformListScrollHandle::new();
+        let samples = Rc::new(RefCell::new(BTreeMap::new()));
+        cx.draw(point(px(17.), px(13.)), size(px(200.), px(80.)), |_, cx| {
+            cx.new(|_| Root(scroll.clone(), samples.clone()))
+                .into_any_element()
+        });
+        let before = samples.borrow()[&2];
+        assert_eq!(before.0, point(px(24.), px(60.)));
+        assert_eq!(before.1, point(px(7.), px(47.)));
+        scroll
+            .0
+            .borrow()
+            .base_handle
+            .set_offset(point(px(0.), px(-20.)));
+        samples.borrow_mut().clear();
+        cx.draw(point(px(17.), px(13.)), size(px(200.), px(80.)), |_, cx| {
+            cx.new(|_| Root(scroll.clone(), samples.clone()))
+                .into_any_element()
+        });
+        let after = samples.borrow()[&2];
+        assert_eq!(after.0, before.0 - point(px(0.), px(20.)));
+        assert_eq!(after.1, before.1);
+    }
 
     #[gpui::test]
     fn horizontal_wheel_bypasses_tall_uniform_list(cx: &mut TestAppContext) {

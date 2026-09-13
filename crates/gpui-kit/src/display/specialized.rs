@@ -19,8 +19,11 @@ use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use super::chart::scale::{NumericScale, ScaleKind};
 use super::plot::{Plot, PlotMark, PlotState};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt};
 use crate::strings::{ActiveStrings, StringKey, Strings};
+
+#[path = "specialized_motion.rs"]
+mod motion;
 
 /// A stable identity, human label, and finite raw quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -78,6 +81,7 @@ pub enum SpecializedError {
     EmptySample,
     InvalidRange,
     Overflow,
+    UnknownFocus(SharedString),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +96,7 @@ pub struct SpecializedData {
     shapes: Vec<Shape>,
     key: Vec<WeightedValue>,
     labels: HashMap<SharedString, (StringKey, Vec<SharedString>)>,
+    navigation: Vec<(WeightedValue, bool)>,
 }
 
 fn validate(items: &[WeightedValue], nonnegative: bool) -> Result<(), SpecializedError> {
@@ -154,6 +159,136 @@ fn weight(node: &HierarchyNode) -> f64 {
 }
 
 impl SpecializedData {
+    /// Controlled treemap drilldown. Ancestor and child controls retain caller
+    /// identities/wording; choosing one only proposes a new `focus` to the host.
+    /// The complete hierarchy is validated before selecting a subtree.
+    pub fn treemap_at(root: &HierarchyNode, focus: &str) -> Result<Self, SpecializedError> {
+        Self::hierarchy_at(root, focus, false)
+    }
+
+    /// Controlled sunburst drilldown with the same raw totals and navigation
+    /// contract as [`Self::treemap_at`]. The focused node becomes the center.
+    pub fn sunburst_at(root: &HierarchyNode, focus: &str) -> Result<Self, SpecializedError> {
+        Self::hierarchy_at(root, focus, true)
+    }
+
+    fn hierarchy_at(
+        root: &HierarchyNode,
+        focus: &str,
+        radial: bool,
+    ) -> Result<Self, SpecializedError> {
+        let mut all = Vec::new();
+        hierarchy_weights(root, &mut all)?;
+        validate(&all, true)?;
+        fn find<'a>(
+            node: &'a HierarchyNode,
+            focus: &str,
+            path: &mut Vec<&'a HierarchyNode>,
+        ) -> bool {
+            path.push(node);
+            if node.item.id == focus || node.children.iter().any(|c| find(c, focus, path)) {
+                return true;
+            }
+            path.pop();
+            false
+        }
+        let mut path = Vec::new();
+        if !find(root, focus, &mut path) {
+            return Err(SpecializedError::UnknownFocus(focus.into()));
+        }
+        let node = path[path.len() - 1];
+        let mut data = if radial {
+            Self::sunburst(node)?
+        } else {
+            Self::treemap(node)?
+        };
+        data.navigation = path
+            .into_iter()
+            .chain(node.children.iter())
+            .map(|node| {
+                let mut item = node.item.clone();
+                item.value = weight(node);
+                (item, node.item.id == focus)
+            })
+            .collect();
+        Ok(data)
+    }
+
+    /// Exact picking against painted polygons, in reverse paint order. `frame`
+    /// is the pixel size of the plot; `stroke` is the painted line width in
+    /// pixels. Semantic rectangles remain envelopes, never polygon hit regions.
+    pub fn hit_test(
+        &self,
+        p: Point<f32>,
+        frame: gpui::Size<f32>,
+        stroke: f32,
+    ) -> Option<SharedString> {
+        if !p.x.is_finite()
+            || !p.y.is_finite()
+            || !(0.0..=1.0).contains(&p.x)
+            || !(0.0..=1.0).contains(&p.y)
+            || !frame.width.is_finite()
+            || !frame.height.is_finite()
+            || !stroke.is_finite()
+            || stroke < 0.0
+            || frame.width <= 0.0
+            || frame.height <= 0.0
+        {
+            return None;
+        }
+        self.shapes
+            .iter()
+            .rev()
+            .find(|shape| {
+                let pixel = |p: Point<f32>| point(p.x * frame.width, p.y * frame.height);
+                let distance = |a: Point<f32>, b: Point<f32>| {
+                    let a = pixel(a);
+                    let b = pixel(b);
+                    let q = pixel(p);
+                    let dx = b.x - a.x;
+                    let dy = b.y - a.y;
+                    let length = dx * dx + dy * dy;
+                    let t = if length == 0.0 {
+                        0.0
+                    } else {
+                        ((q.x - a.x) * dx + (q.y - a.y) * dy) / length
+                    }
+                    .clamp(0.0, 1.0);
+                    (q.x - a.x - t * dx).hypot(q.y - a.y - t * dy)
+                };
+                if shape.points.len() == 2 {
+                    return distance(shape.points[0], shape.points[1]) <= stroke / 2.0;
+                }
+                let mut inside = false;
+                for (a, b) in shape
+                    .points
+                    .iter()
+                    .zip(shape.points.iter().cycle().skip(1))
+                    .take(shape.points.len())
+                {
+                    if distance(*a, *b) < 0.0001 {
+                        return true;
+                    }
+                    if (a.y > p.y) != (b.y > p.y)
+                        && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+                    {
+                        inside = !inside;
+                    }
+                }
+                inside
+            })
+            .map(|shape| shape.item.id.clone())
+    }
+
+    /// Paint vertices for a business identity. These are normalized displayed
+    /// polygons/segments, not label boxes or an accessibility-region promise.
+    pub fn geometry(&self, id: &str) -> Option<&[Point<f32>]> {
+        self.shapes
+            .iter()
+            .find(|s| s.item.id == id)
+            .map(|s| s.points.as_slice())
+    }
+
     // Layout retains caller text; apply Kit-owned wording once, at rendering,
     // to both the geometric marks and the persistent exact-value key.
     fn localize(mut self, strings: &Strings) -> Self {
@@ -328,6 +463,7 @@ impl SpecializedData {
             shapes: vec![shape],
             key,
             labels,
+            ..Self::default()
         })
     }
 
@@ -639,11 +775,13 @@ impl BoxSummary {
 }
 
 type Selection = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type Hover = Rc<dyn Fn(Option<SharedString>, &mut Window, &mut App)>;
 
 #[derive(Default)]
 struct SelectionState {
     declared: Option<SharedString>,
     current: Option<SharedString>,
+    hovered: Option<SharedString>,
 }
 
 fn color_index(id: &str) -> usize {
@@ -661,6 +799,12 @@ pub struct SpecializedChart {
     state: PlotState<SpecializedData>,
     current: Option<SharedString>,
     on_current: Option<Selection>,
+    controlled: bool,
+    on_hover: Option<Hover>,
+    on_navigate: Option<Selection>,
+    motion: bool,
+    animation: Option<crate::motion::MotionSpec>,
+    labels: bool,
 }
 
 impl SpecializedChart {
@@ -675,7 +819,65 @@ impl SpecializedChart {
             state,
             current: None,
             on_current: None,
+            controlled: false,
+            on_hover: None,
+            on_navigate: None,
+            motion: true,
+            animation: None,
+            labels: false,
         }
+    }
+
+    /// Controlled selection. A refused proposal never changes the painted or
+    /// semantic selection; `None` deliberately selects no shape.
+    pub fn selected(mut self, id: Option<SharedString>) -> Self {
+        self.current = id;
+        self.controlled = true;
+        self
+    }
+
+    /// Keyed enter/update/exit transitions. Exact labels/values update at once;
+    /// only geometry and opacity interpolate. Removed shapes are decorative.
+    pub fn motion(mut self, enabled: bool) -> Self {
+        self.motion = enabled;
+        self
+    }
+
+    /// Enables visual transitions (the default). Disabling settles immediately;
+    /// input and exact readings remain available. Reduced motion always wins.
+    pub fn animate(self, enabled: bool) -> Self {
+        self.motion(enabled)
+    }
+
+    /// Override theme timing without bypassing reduced motion.
+    pub fn animation(mut self, spec: crate::motion::MotionSpec) -> Self {
+        self.animation = Some(spec);
+        self
+    }
+
+    /// Measured on-plot labels and leader lines, with crowded labels omitted.
+    /// The persistent exact-value key remains available at every density.
+    pub fn labels(mut self, enabled: bool) -> Self {
+        self.labels = enabled;
+        self
+    }
+
+    /// Proposes a hierarchy focus identity (ancestors go back, children drill
+    /// down). Rebuild data with `treemap_at`/`sunburst_at` to accept the proposal.
+    pub fn on_navigate(
+        mut self,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_navigate = Some(Rc::new(handler));
+        self
+    }
+
+    pub fn on_hover(
+        mut self,
+        handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_hover = Some(Rc::new(handler));
+        self
     }
 
     pub fn current(mut self, id: impl Into<SharedString>) -> Self {
@@ -695,12 +897,34 @@ impl SpecializedChart {
 impl RenderOnce for SpecializedChart {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let state = self.state.map(|data| data.localize(cx.strings()));
+        let mut painted = Vec::new();
+        let animation = crate::motion::keyed::slot::<motion::ShapeMotion>(
+            &self.ident.child("geometry").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        if !matches!(self.state, PlotState::Ready(_) | PlotState::Stale { .. }) {
+            *animation.borrow_mut() = motion::ShapeMotion::default();
+        }
+        let state = self.state.map(|data| {
+            let mut data = data.localize(cx.strings());
+            if self.motion {
+                painted = animation
+                    .borrow_mut()
+                    .animate(&mut data, self.animation, window, cx);
+            } else {
+                *animation.borrow_mut() = motion::ShapeMotion::default();
+                painted = data.shapes.iter().cloned().map(|s| (s, 1.0)).collect();
+            }
+            data
+        });
         let data = match &state {
             PlotState::Ready(data) | PlotState::Stale { data, .. } => data.clone(),
             _ => SpecializedData::default(),
         };
         let key = data.key.clone();
+        let navigation = data.navigation.clone();
+        let navigation_id = self.ident.child("navigation");
         let selectable = data
             .shapes
             .iter()
@@ -713,19 +937,22 @@ impl RenderOnce for SpecializedChart {
         );
         {
             let mut state = interaction.borrow_mut();
-            if state.declared != self.current {
+            if self.controlled || state.declared != self.current {
                 state.current = self.current.clone();
                 state.declared = self.current;
             }
-            if state
-                .current
-                .as_ref()
-                .is_none_or(|id| !data.shapes.iter().any(|s| &s.item.id == id))
+            if !self.controlled
+                && state
+                    .current
+                    .as_ref()
+                    .is_none_or(|id| !data.shapes.iter().any(|s| &s.item.id == id))
             {
                 state.current = data.shapes.first().map(|s| s.item.id.clone());
             }
         }
         let current = interaction.borrow().current.clone();
+        let painted_hover = interaction.borrow().hovered.clone();
+        let hover_state = interaction.clone();
         let painted_current = current.clone();
         let plot_state = interaction.clone();
         let plot_report = self.on_current.clone();
@@ -733,6 +960,18 @@ impl RenderOnce for SpecializedChart {
         let state = match state {
             PlotState::Ready(data) if data.key.is_empty() => PlotState::Empty,
             other => other,
+        };
+        let measured =
+            crate::layout::measure::cell(&self.ident.child("plot").semantic_id(), window, cx).get();
+        let stroke_x = if measured.size.width > gpui::px(0.0) {
+            theme.borders.hairline / f32::from(measured.size.width) / 2.0
+        } else {
+            0.0
+        };
+        let stroke_y = if measured.size.height > gpui::px(0.0) {
+            theme.borders.hairline / f32::from(measured.size.height) / 2.0
+        } else {
+            0.0
         };
         let marks = state.map(|data| {
             data.shapes
@@ -742,14 +981,20 @@ impl RenderOnce for SpecializedChart {
                     let min_y = shape.points.iter().map(|p| p.y).fold(1.0, f32::min);
                     let max_x = shape.points.iter().map(|p| p.x).fold(0.0, f32::max);
                     let max_y = shape.points.iter().map(|p| p.y).fold(0.0, f32::max);
+                    let (sx, sy) = if shape.points.len() == 2 {
+                        (stroke_x, stroke_y)
+                    } else {
+                        (0.0, 0.0)
+                    };
+                    let min_x = (min_x - sx).max(0.0);
+                    let min_y = (min_y - sy).max(0.0);
+                    let max_x = (max_x + sx).min(1.0);
+                    let max_y = (max_y + sy).min(1.0);
                     PlotMark::new(
                         shape.item.id.clone(),
                         shape.item.label.clone(),
                         shape.item.value.to_string(),
-                        bounds(
-                            point(min_x.min(0.999), min_y.min(0.999)),
-                            size((max_x - min_x).max(0.001), (max_y - min_y).max(0.001)),
-                        ),
+                        bounds(point(min_x, min_y), size(max_x - min_x, max_y - min_y)),
                     )
                 })
                 .collect()
@@ -761,28 +1006,76 @@ impl RenderOnce for SpecializedChart {
             theme.colors.danger,
         ];
         let hairline = theme.borders.hairline;
+        let pick_data = data.clone();
+        let hover_report = self.on_hover;
+        let controlled = self.controlled;
         let selected_tint = theme.colors.text;
-        let radial = data.shapes.iter().any(|s| s.points.len() > 4);
+        let radial = painted.iter().any(|(s, _)| s.points.len() > 4);
         div()
             .column()
             .w_full()
             .gap_token(&theme, Space::Xs)
+            .when(!navigation.is_empty(), |element| {
+                element.child(
+                    div()
+                        .row()
+                        .flex_wrap()
+                        .gap_token(&theme, Space::Xs)
+                        .children(navigation.into_iter().map(|(item, focused)| {
+                            let handler = self.on_navigate.clone();
+                            let target = item.id.clone();
+                            crate::controls::button::Button::new(
+                                navigation_id.child(item.id.as_ref()),
+                            )
+                            .label(item.label)
+                            .disabled(focused || handler.is_none())
+                            .when_some(
+                                handler.filter(|_| !focused),
+                                |button, handler| {
+                                    button.on_click(move |window, cx| {
+                                        handler(target.clone(), window, cx)
+                                    })
+                                },
+                            )
+                        })),
+                )
+            })
             .child(
                 div().w_full().when(radial, |d| d.w(gpui::px(220.0))).child(
                     Plot::new(self.ident, self.label, marks)
-                        .when_some(current.clone(), |plot, id| plot.current(id))
+                        .labels(self.labels)
+                        .empty_decoration(!painted.is_empty())
+                        .selected(current.clone())
+                        .hit_test(move |p, frame| {
+                            pick_data.hit_test(
+                                p,
+                                size(f32::from(frame.size.width), f32::from(frame.size.height)),
+                                hairline,
+                            )
+                        })
+                        .on_hover(move |id, window, cx| {
+                            hover_state.borrow_mut().hovered = id.clone();
+                            if let Some(report) = &hover_report {
+                                report(id, window, cx);
+                            }
+                        })
                         .on_current(move |id, window, cx| {
-                            plot_state.borrow_mut().current = Some(id.clone());
+                            if !controlled {
+                                plot_state.borrow_mut().current = Some(id.clone());
+                            }
                             if let Some(handler) = &plot_report {
                                 handler(id, window, cx);
                             }
                         })
                         .paint(move |frame, window, _| {
-                            for shape in &data.shapes {
+                            for (shape, alpha) in &painted {
                                 let mut path = if shape.points.len() == 2 {
                                     PathBuilder::stroke(gpui::px(hairline))
                                 } else {
-                                    PathBuilder::fill()
+                                    PathBuilder::fill().with_style(gpui::PathStyle::Fill(
+                                        gpui::FillOptions::default()
+                                            .with_fill_rule(gpui::FillRule::EvenOdd),
+                                    ))
                                 };
                                 for (j, &p) in shape.points.iter().enumerate() {
                                     if j == 0 {
@@ -795,9 +1088,14 @@ impl RenderOnce for SpecializedChart {
                                     path.close();
                                 }
                                 if let Ok(path) = path.build() {
-                                    window.paint_path(path, colors[color_index(&shape.item.id)]);
+                                    window.paint_path(
+                                        path,
+                                        colors[color_index(&shape.item.id)].opacity(*alpha),
+                                    );
                                 }
-                                if painted_current.as_ref() == Some(&shape.item.id) {
+                                if painted_current.as_ref() == Some(&shape.item.id)
+                                    || painted_hover.as_ref() == Some(&shape.item.id)
+                                {
                                     let mut outline = PathBuilder::stroke(gpui::px(hairline * 2.0));
                                     for (i, &p) in shape.points.iter().enumerate() {
                                         if i == 0 {
@@ -810,7 +1108,7 @@ impl RenderOnce for SpecializedChart {
                                         outline.close();
                                     }
                                     if let Ok(path) = outline.build() {
-                                        window.paint_path(path, selected_tint);
+                                        window.paint_path(path, selected_tint.opacity(*alpha));
                                     }
                                 }
                             }
@@ -840,7 +1138,9 @@ impl RenderOnce for SpecializedChart {
                     .child(format!("{}: {}", item.label, item.value))
                     .when(can_select, |element| {
                         element.on_click(move |_, window, cx| {
-                            state.borrow_mut().current = Some(clicked.clone());
+                            if !controlled {
+                                state.borrow_mut().current = Some(clicked.clone());
+                            }
                             if let Some(report) = &report {
                                 report(clicked.clone(), window, cx);
                             }
@@ -871,6 +1171,64 @@ mod tests {
 
     fn item(id: &'static str, value: f64) -> WeightedValue {
         WeightedValue::new(id, id, value)
+    }
+
+    #[test]
+    fn exact_picker_rejects_annulus_envelopes_clips_and_uses_paint_order() {
+        let root = HierarchyNode::branch(
+            "root",
+            "Root",
+            vec![
+                HierarchyNode::leaf(item("small", 1.0)),
+                HierarchyNode::leaf(item("large", 3.0)),
+            ],
+        );
+        let data = SpecializedData::sunburst(&root).expect("valid hierarchy");
+        let frame = size(360.0, 220.0);
+        // The large annular sector's bounding box contains the center, but its
+        // actual fill does not: the root must win, not the last-painted child.
+        assert_eq!(
+            data.hit_test(point(0.5, 0.5), frame, 1.0).as_deref(),
+            Some("root")
+        );
+        assert_eq!(
+            data.hit_test(point(0.72, 0.22), frame, 1.0).as_deref(),
+            Some("small")
+        );
+        assert_eq!(
+            data.hit_test(point(0.12, 0.5), frame, 1.0).as_deref(),
+            Some("large")
+        );
+        assert_eq!(data.hit_test(point(0.99, 0.99), frame, 1.0), None);
+        assert_eq!(data.hit_test(point(-0.1, 0.5), frame, 1.0), None);
+        let overlapping = SpecializedData {
+            shapes: vec![
+                rectangle(item("under", 1.0), 0.0, 0.0, 1.0, 1.0),
+                rectangle(item("over", 2.0), 0.3, 0.2, 0.4, 0.3),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            overlapping.hit_test(point(0.4, 0.3), frame, 1.0).as_deref(),
+            Some("over")
+        );
+        assert_eq!(
+            overlapping.hit_test(point(0.8, 0.3), frame, 1.0).as_deref(),
+            Some("under")
+        );
+    }
+
+    #[test]
+    fn stroke_picker_uses_actual_pixel_width_in_nonsquare_frames() {
+        let data = SpecializedData::range("line", "Line", 2.0, 2.0, [0.0, 10.0])
+            .expect("zero width interval");
+        let frame = size(1000.0, 100.0);
+        assert_eq!(
+            data.hit_test(point(0.2004, 0.5), frame, 1.0).as_deref(),
+            Some("line")
+        );
+        assert_eq!(data.hit_test(point(0.2006, 0.5), frame, 1.0), None);
+        assert_eq!(data.hit_test(point(0.2, 0.7), frame, 1.0), None);
     }
 
     #[test]

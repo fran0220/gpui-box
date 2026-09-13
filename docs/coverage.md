@@ -8,6 +8,20 @@ fact, a locale fact, a transport, or a platform chrome the OS already
 owns. `docs/components.md` describes the components themselves; this file
 exists so a gap is a recorded decision rather than an oversight.
 
+Frozen visual retirement has a paint-only framework primitive: `PaintRecording`
+owns quads/gradients, paths, shadows, underlines, text/image sprites and their
+capture-visible clips/resources. A dynamic offscreen demonstrator lives in
+`tools/headless-visual/src/paint_recording_tests.rs`; it is infrastructure
+evidence, not a Kit component exhibit. Live registrations disappear at removal,
+even while the same visible pixels are replayed. Callers own exit timing,
+recording budgets, reinsertion and reduced-motion disposal.
+
+The remaining generic gap is **composited last-live snapshots** for glass,
+native hosted content/platform surfaces, and deferred overlays. Paint recording
+refuses those capabilities explicitly; it cannot freeze a historical backdrop,
+recover clipped pixels, or replay an `AnyElement` inertly. Families must retire
+unsupported content immediately rather than present shell-only continuity.
+
 Glass optics use a shared height field, Snell refraction, spectral indices and
 Fresnel reflection in all three shader backends. `glass-optics` isolates these
 parameters over a ruled fixture, including fused panes. The implementation is
@@ -1345,3 +1359,18 @@ farthest-position and movement queries still enumerate the document and may
 shape offscreen lazy lines; those are not viewport-bounded operations.
 
 Reference contract: [Apple UITextInput](https://developer.apple.com/documentation/uikit/uitextinput).
+
+## Virtual-root reflow and ambient offsets
+
+UniformList declares its measured row placement and scrolling separately through
+Window's placement scope. Position FLIP observes slot changes while ignoring
+scroll and ancestor slides; paint/input/accessibility still share the original
+element placement. Framework tests cover padded nonzero-origin slots, scrolling,
+nested placement and transient offsets. Trace mounted regressions cover accepted
+and refused hierarchy changes, interrupted reflow, ordinary/virtual row paths,
+new virtual identities, reduced motion and unchanged current readouts.
+
+Variable-height List and custom root adapters retain their prior offset
+semantics until they declare authoritative content-space placement. This is a
+documented motion-coverage gap, not a claim of generic virtualizer reflow. Trace
+removed rows have no paint-retained exit; their live authority retires at once.

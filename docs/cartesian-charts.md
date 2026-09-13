@@ -111,15 +111,76 @@ pixel bounds and color, and is clipped to both those bounds and the plot. Hit an
 semantic bounds use that same clipped rectangle. Return `None` for the standard
 glyph. Overlay a scatter series to compose custom annotations with other marks.
 
-## Keyed geometry and current acceptance boundaries
+## Keyed geometry, style and presence
 
 Raw geometry updates animate by series/point business identity, including reordered
 inputs and interrupted updates. Only projected f64 geometry interpolates; raw
 values and accessible/readout text switch atomically to current caller input.
 Reduced motion settles immediately; `.animate(false)` disables transitions.
-Viewport/domain, mark topology and grouping changes snap, preserving direct
-manipulation. New points start at their true readings; missing/removed points
-disappear immediately rather than manufacturing zero or stale observations.
+Viewport/domain and mark topology changes snap, preserving direct manipulation.
+Grouped bar slots animate by series identity, including reordered input. New
+points enter at their true readings with opacity, never a fabricated zero value.
+Removed/hidden points immediately retire their input and semantic authority while
+paint-only layers fade out. Reentry reverses an unfinished exit continuously.
+Series and explicit point colors interpolate through existing motion primitives;
+line strokes retain series-level color policy. Custom painters receive animated
+color and must honor its alpha. Arbitrary custom painter internals are not morphed.
+
+`.motion(CartesianMotion { enter, update, exit })` accepts existing `MotionSpec`
+values. Defaults resolve Entrance, Resize and Exit theme roles. Changing the
+coordinate system or timing policy clears obsolete exit geometry. Settled
+redraws retain immutable projection, hit-index and style ownership; only active
+transition clocks are sampled. Active geometry still clones the projected graph,
+and revision reconciliation scans source keys: this is not full virtualization.
+
+Point/shared-axis tooltip surfaces float through the generic anchored overlay,
+bounded to the viewport. `.tooltip_content` receives exact current raw rows for
+caller-built rich content. `.floating_tooltip(false)` hides only that surface;
+the persistent accessible readout remains. Removed/hidden/offscreen anchors do
+not retain a stale tooltip. A tooltip may cover nearby marks; it does not reserve
+plot layout space or change source hit geometry.
+
+`.emphasized(Some(series_id))` dims other series using theme opacity and the
+configured update timing. Legend pointer entry/exit emits `Emphasis` proposals;
+the host accepts them explicitly. Dimmed series retain their hit geometry,
+selection, raw values and visibility. Unknown or hidden emphasis identities
+restore normal styling. `ChartLegend::on_emphasis` exposes the same identity
+proposal for standalone legends; existing click/keyboard hide/show is unchanged.
+
+## Persistent selection and overview
+
+`.range(CartesianRange::new(domain, value, label))` adds a dedicated horizontal
+strip for numeric, logarithmic or Unix-ms selections. Its domain is independent
+of the plot viewport and never follows viewport zoom implicitly. The strip
+remains horizontal even for a horizontal main chart. A decorative linear trace
+shows the same raw series' y readings; it is not a second interactive mark layer
+or a miniature reproduction of bar/range/error glyphs. Set `overview: false` for
+selection alone. Overview projection and normalized paths are retained by input
+revision/domain/width; `PathSampling::MinMax` also reduces these linear traces.
+Missing observations break overview paths. Raw inputs are never resampled.
+
+`CartesianEvent::Range(RangeEvent)` exposes Update, Commit and Cancel plus intent
+and logical handle. The caller accepts proposals into `CartesianRange::value`
+and may derive one or more linked viewports, as `cartesian-linked` demonstrates.
+No accepted input is inferred from an unchanged redraw. The strip displays a
+localized transient preview until release; a refused release restores the last
+caller value. Cancelling does not roll back earlier accepted updates. External
+selection or overview-domain replacement cancels an active draft. Delayed older
+proposals count as external replacements under the shared synchronous/latest
+acceptance contract.
+
+Drag outside the selection to create, Shift-drag to replace, drag inside to move,
+or grab a handle to resize. Capture preserves initial measured bounds for outside
+release. Logical Start/End remain ascending raw endpoints on descending domains;
+crossing clamps without swapping identity. Move preserves projected width (not
+raw width on logarithmic scales). Arrow keys edit a focused handle/window by 1%
+of display span; Home/End reach a bound, Escape cancels. Unedited endpoints retain
+their exact f64 bits. Invalid/out-of-domain caller ranges are not normalized:
+editing is rejected. `enabled: false` installs no handlers, cancels capture and
+marks endpoint semantics disabled; arbitrary unmount uses framework cancellation.
+Caller tick formatting supplies endpoint text; exact raw values remain separate
+in events and endpoint semantics. Empty, committed and preview readouts use the
+shared language pack, not time-specific labels.
 
 ## Shared data, sampling and measured performance
 
@@ -154,14 +215,25 @@ CPU redraw times were 26.6 ms disabled versus 175.3 ms enabled. Dense 1k still
 mounted 1,000 targets and took about 53–55 ms. These are test-platform CPU
 measurements, not native GPU/FPS guarantees; elapsed time is not a test budget.
 
+The extended workload explicitly disables reduced motion for 64ms value-update
+and interruption samples and asserts intermediate geometry plus exact new raw
+text. The 100k sparse motion-on value-only retarget fell from 523ms to 315ms by
+avoiding redundant lifecycle hash reconciliation; the active frame still takes
+about 34ms, while mount/revision work and hit rebuilding remain full-source.
+Overview adds separate projection/path/paint costs. Fixture cases use isolated
+TestAppContexts and explicitly remove their windows. These are advisory Linux
+CPU observations, not bounded-work or native-FPS claims.
+
 This is native raw-data composition, not Recharts/ECharts API parity. Automatic
-calendar ticks and entrance/exit choreography are not supplied. Native motion
-visual verification and macOS/Windows evidence remain pending. The legacy
-normalized builders retain their existing keyed motion behavior.
+calendar ticks are not supplied by the fixed-duration Time scale. Exact simulated playback
+exercises the actual Cartesian renderer; native-window motion and macOS/Windows
+evidence remain pending. The legacy normalized builders retain their APIs.
 
 Exhibits: `cartesian` (mixed units, diverging/percentage stacks, gaps, stale
 readings), `cartesian-linked` (wide/narrow shared time state and intervals),
 `cartesian-layout` (opposite edges, horizontal ranges, custom glyphs, click to
 update/reorder raw readings),
+`cartesian-lifecycle` (configurable value/color, hide/show, removal/reentry,
+grouped reorder and direct viewport transitions),
 `cartesian-dense` (exact/sampled wide/narrow paths, spikes, gaps and raw selection),
 `cartesian-states` (raw polar readings and distinct non-ready states).

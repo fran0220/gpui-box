@@ -2168,6 +2168,10 @@ impl WgpuRenderer {
         clear_color: wgpu::Color,
         timestamps: Option<&wgpu::QuerySet>,
     ) -> anyhow::Result<wgpu::SubmissionIndex> {
+        anyhow::ensure!(
+            scene.paint_resources_valid(),
+            "frozen paint resources were reset"
+        );
         self.ensure_intermediate_textures();
 
         let gamma_params = GammaParams {
@@ -4140,6 +4144,103 @@ mod tests {
         MAX_GLASS_SIGMA_PER_PASS, MonochromeSprite, PolychromeSprite, Quad, Shadow, SubpixelSprite,
         Underline,
     };
+
+    #[test]
+    fn frozen_paint_reset_between_replay_and_submission_is_refused() -> anyhow::Result<()> {
+        use gpui::{
+            App, HeadlessAppContext, PaintRecording, PaintRecordingError, RenderImage, Window,
+            canvas, prelude::*, px,
+        };
+        use std::{
+            cell::{Cell, RefCell},
+            rc::Rc,
+        };
+        let _gpu = crate::serialised_gpu_test();
+        struct Host {
+            live: bool,
+            recording: Rc<RefCell<Option<PaintRecording>>>,
+            error: Rc<Cell<Option<PaintRecordingError>>>,
+            image: Arc<RenderImage>,
+        }
+        impl Render for Host {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let live = self.live;
+                let slot = self.recording.clone();
+                let error = self.error.clone();
+                let image = self.image.clone();
+                canvas(
+                    |_, _, _| (),
+                    move |_, _, window, _| {
+                        if live {
+                            let mark = window.paint_mark();
+                            let bounds = gpui::Bounds::new(
+                                gpui::point(px(7.), px(11.)),
+                                gpui::size(px(32.), px(24.)),
+                            );
+                            window
+                                .paint_image(bounds, bounds, Corners::default(), image, 0, false)
+                                .expect("live image paint");
+                            *slot.borrow_mut() =
+                                Some(window.record_paint_since(mark).expect("live recording"));
+                        } else if let Some(recording) = slot.borrow().as_ref() {
+                            error.set(window.paint_recording(recording).err());
+                        }
+                    },
+                )
+                .size_full()
+            }
+        }
+        let atlas_slot = Rc::new(RefCell::new(None));
+        let renderer_slot = atlas_slot.clone();
+        let mut cx = HeadlessAppContext::with_platform(
+            Arc::new(crate::CosmicTextSystem::new_without_system_fonts(
+                "sans-serif",
+            )),
+            Arc::new(()),
+            move || {
+                let renderer = WgpuHeadlessRenderer::new().expect("software renderer");
+                *renderer_slot.borrow_mut() = Some(renderer.renderer.atlas.clone());
+                Some(Box::new(renderer))
+            },
+        );
+        let error = Rc::new(Cell::new(None));
+        let window = cx.open_window(gpui::size(px(64.), px(64.)), |_, cx: &mut App| {
+            cx.new(|_| Host {
+                live: true,
+                recording: Default::default(),
+                error: error.clone(),
+                image: Arc::new(RenderImage::new(vec![image::Frame::new(
+                    image::RgbaImage::from_pixel(2, 3, image::Rgba([60, 120, 240, 255])),
+                )])),
+            })
+        })?;
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))?;
+        window.update(&mut cx, |host, _, cx| {
+            host.live = false;
+            cx.notify();
+        })?;
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))?;
+        assert_eq!(error.get(), None);
+        // The frame now owns the replayed recording. Reset before submitting
+        // that same Scene to the offscreen screenshot target.
+        atlas_slot
+            .borrow()
+            .as_ref()
+            .expect("renderer atlas")
+            .clear();
+        let failure = cx
+            .capture_screenshot(window.into())
+            .expect_err("stale frame must never resolve reset tiles");
+        assert!(
+            failure
+                .to_string()
+                .contains("frozen paint resources were reset")
+        );
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))?;
+        assert_eq!(error.get(), Some(PaintRecordingError::ResourceReset));
+        cx.capture_screenshot(window.into())?;
+        Ok(())
+    }
 
     #[test]
     fn surface_preferences_use_replacement_capabilities() -> anyhow::Result<()> {

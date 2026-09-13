@@ -55,8 +55,14 @@ use agent::{
     artifact_preview, clarification, cost_meter, feedback_rating, offering_catalog,
     permission_matrix, persona, prompt_builder, server_list, thinking, tool_call,
 };
-use canvas::{canvas_regions, canvas_tools, node_graph, node_graph_layout, node_graph_motion};
-use cartesian::{cartesian, cartesian_dense, cartesian_layout, cartesian_linked, cartesian_states};
+use canvas::{
+    canvas_regions, canvas_tools, node_graph, node_graph_layout, node_graph_motion,
+    node_graph_routing,
+};
+use cartesian::{
+    cartesian, cartesian_dense, cartesian_layout, cartesian_lifecycle, cartesian_linked,
+    cartesian_states,
+};
 use compositions::{motion_flip, motion_state, reading_direction};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
@@ -87,8 +93,8 @@ use display::{
 use effects::{cinematic_effects, visual_effects};
 use flip_configuration::flip_configuration;
 use game::game_ui;
-use geography::geography;
-use heatmap::continuous_heatmap;
+use geography::{geography, geography_scale};
+use heatmap::{continuous_heatmap, continuous_heatmap_transition, heatmap_reordering};
 use interaction::{pull_to_refresh, swipe_actions};
 use layout::{
     aspect_ratio, container, desktop_titlebar, dock_floating, dock_tree, grid, ide_shell,
@@ -107,8 +113,8 @@ use overlay::{
     glass_materials, glass_optics, hover_card, kbd, media_caption, menu, menubar,
     notification_center, overlay, popover, toast, tooltip,
 };
-use plot::{raw_candlestick, sankey_layout};
-use specialized::{specialized, specialized_distribution};
+use plot::{raw_candlestick, sankey_layout, sankey_motion};
+use specialized::{specialized, specialized_distribution, specialized_exploration};
 use structured::{json_view, schema_form};
 
 /// What a rendering exists to show.
@@ -902,6 +908,11 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
         },
         Scene {
+            name: "node-graph-routing",
+            build: node_graph_routing,
+            shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
+        },
+        Scene {
             name: "node-graph-motion",
             build: node_graph_motion,
             shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
@@ -1081,6 +1092,11 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["CartesianChart"]),
         },
         Scene {
+            name: "cartesian-lifecycle",
+            build: cartesian_lifecycle,
+            shows: Shows::Subjects(&["CartesianChart"]),
+        },
+        Scene {
             name: "cartesian-dense",
             build: cartesian_dense,
             shows: Shows::Subjects(&["CartesianChart"]),
@@ -1106,6 +1122,26 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["SpecializedChart"]),
         },
         Scene {
+            name: "specialized-exploration",
+            build: specialized_exploration,
+            shows: Shows::Subjects(&["SpecializedChart"]),
+        },
+        Scene {
+            name: "continuous-heatmap-transition",
+            build: continuous_heatmap_transition,
+            shows: Shows::Subjects(&["ContinuousHeatmap"]),
+        },
+        Scene {
+            name: "heatmap-reordering",
+            build: heatmap_reordering,
+            shows: Shows::Subjects(&["ContinuousHeatmap"]),
+        },
+        Scene {
+            name: "sankey-motion",
+            build: sankey_motion,
+            shows: Shows::Subjects(&["SankeyChart"]),
+        },
+        Scene {
             name: "continuous-heatmap",
             build: continuous_heatmap,
             shows: Shows::Subjects(&["ContinuousHeatmap"]),
@@ -1123,6 +1159,11 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "geography",
             build: geography,
+            shows: Shows::Subjects(&["GeoMap"]),
+        },
+        Scene {
+            name: "geography-scale",
+            build: geography_scale,
             shows: Shows::Subjects(&["GeoMap"]),
         },
         Scene {

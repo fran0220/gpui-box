@@ -20,6 +20,7 @@ impl MetalAtlas {
             monochrome_textures: Default::default(),
             polychrome_textures: Default::default(),
             tiles_by_key: Default::default(),
+            leases: Default::default(),
         }))
     }
 
@@ -34,9 +35,26 @@ struct MetalAtlasState {
     monochrome_textures: AtlasTextureList<MetalAtlasTexture>,
     polychrome_textures: AtlasTextureList<MetalAtlasTexture>,
     tiles_by_key: FxHashMap<AtlasKey, AtlasTile>,
+    leases: gpui::AtlasLeaseRegistry,
 }
 
 impl PlatformAtlas for MetalAtlas {
+    fn resource_revision(&self) -> u64 {
+        self.0.lock().leases.revision()
+    }
+
+    fn retain_tiles(self: std::sync::Arc<Self>, tiles: &[AtlasTile]) -> Option<gpui::AtlasLease> {
+        let mut lock = self.0.lock();
+        let atlas = self.clone();
+        lock.leases.pin_tiles(tiles, move |epoch, keys| {
+            let mut lock = atlas.0.lock();
+            let removed = lock.leases.release(epoch, keys);
+            for key in removed {
+                lock.remove(&key);
+            }
+        })
+    }
+
     fn get_or_insert_with<'a>(
         &self,
         key: &AtlasKey,
@@ -55,15 +73,26 @@ impl PlatformAtlas for MetalAtlas {
             let texture = lock.texture(tile.texture_id);
             texture.upload(tile.bounds, &bytes);
             lock.tiles_by_key.insert(key.clone(), tile);
+            lock.leases.insert_tile(key.clone(), tile);
             Ok(Some(tile))
         }
     }
 
     fn remove(&self, key: &AtlasKey) {
-        let mut lock = self.0.lock();
+        self.0.lock().remove(key);
+    }
+}
+
+impl MetalAtlasState {
+    fn remove(&mut self, key: &AtlasKey) {
+        let lock = self;
+        if lock.leases.defer_remove(key) {
+            return;
+        }
         let Some(tile) = lock.tiles_by_key.remove(key) else {
             return;
         };
+        lock.leases.remove_tile(tile);
         let id = tile.texture_id;
 
         let textures = match id.kind {

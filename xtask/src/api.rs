@@ -15,7 +15,7 @@
 //! # How it decides
 //!
 //! It reads every source under `crates/gpui-kit/src`, drops comments and
-//! everything from the first `#[cfg(test)]`, and then:
+//! syntax nodes excluded from non-test builds, and then:
 //!
 //! - a `pub struct` that derives `IntoElement` is a **builder**, and one that
 //!   something implements `Render` for is a **view**. Those are the two shapes
@@ -552,13 +552,10 @@ fn public_paths(root: &Path, lib: &Path) -> Result<BTreeMap<(String, String), St
     Ok(paths)
 }
 
-/// Drops comments that are not documentation, and everything from the first
-/// `#[cfg(test)]`, so a test fixture never enters the index as an API.
+/// Drops comments that are not documentation and syntax nodes excluded from
+/// non-test builds, retaining production API after test fields and methods.
 fn strip(source: &str) -> String {
-    let source = match source.find("#[cfg(test)]") {
-        Some(at) => &source[..at],
-        None => source,
-    };
+    let source = crate::strings::production_source(source);
 
     let mut out = String::with_capacity(source.len());
     let characters: Vec<char> = source.chars().collect();
@@ -1952,6 +1949,46 @@ pub enum SelectEvent {
         let source = strip("pub struct A;\n#[cfg(test)]\nmod tests { pub struct B; }\n");
         assert!(source.contains("pub struct A"));
         assert!(!source.contains("pub struct B"));
+    }
+
+    #[test]
+    fn test_field_before_component_preserves_api_and_scene_ownership() {
+        let source = strip(
+            r#"
+struct Geometry {
+    #[cfg(test)] builds: usize,
+    revision: u64,
+}
+#[derive(IntoElement)]
+pub struct NodeGraph { geometry: Geometry }
+impl NodeGraph {
+    #[cfg(test)] pub fn fixture() -> Self { todo!() }
+    pub fn new(ident: impl Into<Ident>) -> Self { todo!() }
+    pub fn animate_layout(self, animate: bool) -> Self { self }
+}
+fn node_graph() -> AnyElement {
+    NodeGraph::new("graph").into_any_element()
+}
+"#,
+        );
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "canvas/graph.rs", &mut items, &mut events);
+        assert_eq!(items["NodeGraph"].kind, Kind::Builder);
+        assert_eq!(
+            items["NodeGraph"].constructors,
+            ["new(ident: impl Into<Ident>) -> Self"]
+        );
+        assert_eq!(
+            items["NodeGraph"].options,
+            ["animate_layout(animate: bool) -> Self"]
+        );
+        let scene = &source[source.find("fn node_graph(").expect("scene function")..];
+        let lines: Vec<_> = scene.lines().collect();
+        assert_eq!(
+            mentions(&reach("node_graph", &local_bodies(&lines)), &items),
+            ["NodeGraph"]
+        );
     }
 
     /// A wrapped signature has to collapse the same way every time.

@@ -20,6 +20,9 @@ use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
+#[path = "heatmap_motion.rs"]
+mod heatmap_motion;
+
 /// One observation in the matrix, or the absence of one.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeatCell {
@@ -687,6 +690,13 @@ impl ContinuousHeatCell {
 
 type HeatSelection = std::rc::Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
+struct HeatVisual {
+    color: crate::motion::Transition<gpui::Hsla>,
+    value_opacity: crate::motion::Transition<f32>,
+    reading: Option<f64>,
+    spec: crate::motion::MotionSpec,
+}
+
 /// A raw-valued matrix with visible cell values and a numeric color legend.
 /// Selection is caller controlled. Invalid coordinates, identities, and readings
 /// produce an explicit error; a stale refresh retains verified cells and reason.
@@ -700,6 +710,8 @@ pub struct ContinuousHeatmap {
     scale: HeatColorScale,
     current: Option<SharedString>,
     on_current: Option<HeatSelection>,
+    motion: bool,
+    animation: Option<crate::motion::MotionSpec>,
 }
 
 impl ContinuousHeatmap {
@@ -718,7 +730,28 @@ impl ContinuousHeatmap {
             scale,
             current: None,
             on_current: None,
+            motion: true,
+            animation: None,
         }
+    }
+
+    /// Animate color changes and fade in changed value text. Semantic values
+    /// and tooltips remain exact latest readings; numbers are never tweened.
+    pub fn motion(mut self, enabled: bool) -> Self {
+        self.motion = enabled;
+        self
+    }
+
+    /// Default-enabled visual color, value-opacity and keyed layout motion.
+    /// Disabling snaps the displayed data without disabling input.
+    pub fn animate(self, enabled: bool) -> Self {
+        self.motion(enabled)
+    }
+
+    /// Override theme timing; application reduced motion always takes precedence.
+    pub fn animation(mut self, spec: crate::motion::MotionSpec) -> Self {
+        self.animation = Some(spec);
+        self
     }
 
     pub fn rows(mut self, rows: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self {
@@ -774,126 +807,325 @@ fn validate_continuous(
 }
 
 impl RenderOnce for ContinuousHeatmap {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use super::plot::{Plot, PlotState};
+        use crate::motion::{Flipping, flip};
         use gpui::StatefulInteractiveElement;
         let theme = cx.theme().clone();
+        let layout = crate::motion::keyed::slot::<heatmap_motion::HeatLayout>(
+            &self.ident.child("layout-motion").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let timing = self.animation.unwrap_or_else(|| {
+            crate::motion::MotionPolicy::resolve(crate::motion::MotionRole::StateChange, cx).spec()
+        });
+        let enabled = self.motion && !cx.reduce_motion();
         let (cells, stale) = match self.state {
             PlotState::Ready(cells) => (cells, None),
             PlotState::Stale { data, reason } => (data, Some(reason)),
             other => {
+                *layout.borrow_mut() = heatmap_motion::HeatLayout::default();
                 return Plot::new(self.ident, self.label, other.map(|_| Vec::new()))
                     .into_any_element();
             }
         };
         if let Err(reason) = validate_continuous(&self.rows, &self.columns, &cells, self.scale) {
+            *layout.borrow_mut() = heatmap_motion::HeatLayout::default();
             let reason = cx
                 .strings()
                 .text(StringKey::from_name(reason).expect("heatmap error key"));
             return Plot::new(self.ident, self.label, PlotState::Error(reason)).into_any_element();
         }
-        if self.rows.is_empty() || self.columns.is_empty() {
-            return Plot::new(self.ident, self.label, PlotState::Empty).into_any_element();
-        }
+        let empty = self.rows.is_empty() || self.columns.is_empty();
+        layout.borrow_mut().begin(timing, enabled);
+        let matrix_bounds = crate::layout::measure::cell(
+            &self.ident.child("matrix-bounds").semantic_id(),
+            window,
+            cx,
+        );
+        // The shared measured frame supplies the real matrix width. Flexible
+        // slots keep sibling layout settled; FLIP assigns the displayed child
+        // border box so column-count updates also animate width and reflow text.
+        let column_width = (matrix_bounds.get().size.width > px(0.0) && !self.columns.is_empty())
+            .then(|| {
+                ((f32::from(matrix_bounds.get().size.width)
+                    - ROW_LABEL
+                    - theme.space(Space::Xs) * self.columns.len() as f32)
+                    / self.columns.len() as f32)
+                    .max(0.0)
+            });
+        let headers = self
+            .columns
+            .iter()
+            .map(|column| {
+                let id = self.ident.child("column").child(column.id.as_ref());
+                let (measured, alpha) = layout.borrow_mut().track(
+                    id.semantic_id(),
+                    theme.colors.canvas,
+                    column.label.clone(),
+                    window,
+                    cx,
+                );
+                let handle = flip(id.child("flip").semantic_id(), window, cx);
+                let header = div()
+                    .w_full()
+                    .when_some(column_width, |header, width| header.w(px(width)))
+                    .min_w_0()
+                    .relative()
+                    .truncate()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .opacity(alpha)
+                    .child(column.label.clone())
+                    .child(
+                        gpui::canvas(
+                            move |bounds, window, _| {
+                                crate::layout::measure::record(&measured, bounds, window)
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .size_full(),
+                    )
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(id.semantic_id(), Role::Text).text(column.label.clone()),
+                    )
+                    .flip_size(&handle, window, cx)
+                    .animate(enabled)
+                    .animation(timing);
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .items_start()
+                    .child(header)
+            })
+            .collect::<Vec<_>>();
         let header = div()
             .row()
             .gap_token(&theme, Space::Xs)
             .child(div().w(px(ROW_LABEL)).flex_none())
-            .children(self.columns.iter().map(|column| {
-                div()
-                    .flex_1()
-                    .min_w_0()
+            .children(headers);
+        let rows = self
+            .rows
+            .iter()
+            .map(|row| {
+                let row_id = self.ident.child("row").child(row.id.as_ref());
+                let (measured, alpha) = layout.borrow_mut().track(
+                    row_id.semantic_id(),
+                    theme.colors.canvas,
+                    row.label.clone(),
+                    window,
+                    cx,
+                );
+                let handle = flip(row_id.child("flip").semantic_id(), window, cx);
+                let row_label = div()
+                    .w(px(ROW_LABEL))
+                    .flex_none()
+                    .relative()
                     .truncate()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .child(column.label.clone())
-            }));
-        let rows = self.rows.iter().map(|row| {
-            div()
-                .row()
-                .items_center()
-                .gap_token(&theme, Space::Xs)
-                .child(
-                    div()
-                        .w(px(ROW_LABEL))
-                        .flex_none()
-                        .truncate()
-                        .child(row.label.clone()),
-                )
-                .children(self.columns.iter().map(|column| {
-                    let cell = cells
-                        .iter()
-                        .find(|c| c.row == row.id && c.column == column.id);
-                    let ident =
-                        self.ident
-                            .child("cell")
-                            .child(cell.map(|c| c.id.clone()).unwrap_or_else(|| {
+                    .opacity(alpha)
+                    .child(row.label.clone())
+                    .child(
+                        gpui::canvas(
+                            move |bounds, window, _| {
+                                crate::layout::measure::record(&measured, bounds, window)
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .size_full(),
+                    )
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(row_id.semantic_id(), Role::Text).text(row.label.clone()),
+                    )
+                    .flip(&handle, window, cx)
+                    .animate(enabled)
+                    .animation(timing);
+                div()
+                    .row()
+                    .items_center()
+                    .gap_token(&theme, Space::Xs)
+                    .child(row_label)
+                    .children(self.columns.iter().map(|column| {
+                        let cell = cells
+                            .iter()
+                            .find(|c| c.row == row.id && c.column == column.id);
+                        let ident = self.ident.child("cell").child(
+                            cell.map(|c| c.id.clone()).unwrap_or_else(|| {
                                 Ident::new(row.id.clone())
                                     .child(column.id.as_ref())
                                     .semantic_id()
-                            }));
-                    let value = cell
-                        .and_then(|c| c.reading)
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| {
-                            cx.strings().text(StringKey::HeatmapMissing).to_string()
-                        });
-                    let label = cell
-                        .map(|c| c.label.clone())
-                        .unwrap_or_else(|| format!("{} / {}", row.label, column.label).into());
-                    let fill = cell
-                        .and_then(|c| c.reading)
-                        .map(|v| self.scale.color(v).expect("validated reading"))
-                        .unwrap_or(theme.colors.canvas);
-                    let selected = cell.is_some_and(|c| self.current.as_ref() == Some(&c.id));
-                    let mut square = div()
-                        .id(ident.element_id())
-                        .flex_1()
-                        .min_w_0()
-                        .h(px(32.0))
-                        .overflow_hidden()
-                        .bg(fill)
-                        .border_1()
-                        .border_color(if selected {
-                            theme.colors.text
-                        } else {
-                            theme.colors.control_hairline
-                        })
-                        .child(
-                            div()
-                                .bg(theme.colors.canvas)
-                                .text_color(theme.colors.text)
-                                .type_scale(&theme, TypeScale::Caption)
-                                .truncate()
-                                .child(value.clone()),
-                        )
-                        .tip(
-                            ident.clone(),
-                            cx.strings()
-                                .format(StringKey::HeatmapCellReading, &[label.as_ref(), &value]),
+                            }),
                         );
-                    if let (Some(cell), Some(report)) = (cell, self.on_current.clone()) {
-                        let id = cell.id.clone();
-                        let key_id = id.clone();
-                        let key_report = report.clone();
-                        square = square
-                            .tab_index(0)
-                            .on_click(move |_, window, cx| report(id.clone(), window, cx))
-                            .on_key_down(move |event, window, cx| {
-                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                    key_report(key_id.clone(), window, cx);
-                                }
+                        let value = cell
+                            .and_then(|c| c.reading)
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| {
+                                cx.strings().text(StringKey::HeatmapMissing).to_string()
                             });
-                    }
-                    square.semantic_in(
-                        cx,
-                        NodeSpec::new(ident.semantic_id(), Role::Cell)
-                            .parent(self.ident.semantic_id())
-                            .text(label)
-                            .value(value)
-                            .selected(selected),
-                    )
-                }))
-        });
+                        let label = cell
+                            .map(|c| c.label.clone())
+                            .unwrap_or_else(|| format!("{} / {}", row.label, column.label).into());
+                        let fill = cell
+                            .and_then(|c| c.reading)
+                            .map(|v| self.scale.color(v).expect("validated reading"))
+                            .unwrap_or(theme.colors.canvas);
+                        let visual = crate::motion::keyed::slot::<Option<HeatVisual>>(
+                            &ident.child("visual").semantic_id(),
+                            window.window_handle().window_id(),
+                            cx,
+                        );
+                        let spec = timing;
+                        let mut visual = visual.borrow_mut();
+                        let reading = cell.and_then(|c| c.reading);
+                        let visual = visual.get_or_insert_with(|| HeatVisual {
+                            color: crate::motion::Transition::new(fill, spec),
+                            value_opacity: crate::motion::Transition::new(1.0, spec),
+                            reading,
+                            spec,
+                        });
+                        if visual.spec != spec {
+                            super::plot::retime(&mut visual.color, spec);
+                            super::plot::retime(&mut visual.value_opacity, spec);
+                            visual.spec = spec;
+                        }
+                        if self.motion {
+                            visual.color.set(fill);
+                            if visual.reading != reading {
+                                visual.value_opacity.snap(0.0);
+                            }
+                            visual.value_opacity.set(1.0);
+                        } else {
+                            visual.color.snap(fill);
+                            visual.value_opacity.snap(1.0);
+                        }
+                        visual.reading = reading;
+                        let fill = visual.color.animate(window, cx);
+                        let value_opacity =
+                            visual.value_opacity.animate(window, cx).clamp(0.0, 1.0);
+                        let (measured, alpha) = layout.borrow_mut().track(
+                            ident.semantic_id(),
+                            fill,
+                            value.clone().into(),
+                            window,
+                            cx,
+                        );
+                        let handle = flip(ident.child("flip").semantic_id(), window, cx);
+                        let selected = cell.is_some_and(|c| self.current.as_ref() == Some(&c.id));
+                        let mut square = div()
+                            .id(ident.element_id())
+                            .relative()
+                            .opacity(alpha)
+                            .child(
+                                gpui::canvas(
+                                    move |bounds, window, _| {
+                                        crate::layout::measure::record(&measured, bounds, window)
+                                    },
+                                    |_, _, _, _| {},
+                                )
+                                .absolute()
+                                .size_full(),
+                            )
+                            .w_full()
+                            .when_some(column_width, |square, width| square.w(px(width)))
+                            .min_w_0()
+                            .h(px(32.0))
+                            .overflow_hidden()
+                            .bg(fill)
+                            .border_1()
+                            .border_color(if selected {
+                                theme.colors.text
+                            } else {
+                                theme.colors.control_hairline
+                            })
+                            .child(
+                                div()
+                                    .bg(theme.colors.canvas)
+                                    .text_color(theme.colors.text)
+                                    .type_scale(&theme, TypeScale::Caption)
+                                    .opacity(value_opacity)
+                                    .truncate()
+                                    .child(value.clone()),
+                            )
+                            .tip(
+                                ident.clone(),
+                                cx.strings().format(
+                                    StringKey::HeatmapCellReading,
+                                    &[label.as_ref(), &value],
+                                ),
+                            );
+                        if let (Some(cell), Some(report)) = (cell, self.on_current.clone()) {
+                            let id = cell.id.clone();
+                            let key_id = id.clone();
+                            let key_report = report.clone();
+                            square = square
+                                .tab_index(0)
+                                .on_click(move |_, window, cx| {
+                                    cx.stop_propagation();
+                                    report(id.clone(), window, cx);
+                                })
+                                .on_key_down(move |event, window, cx| {
+                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                        cx.stop_propagation();
+                                        key_report(key_id.clone(), window, cx);
+                                    }
+                                });
+                        }
+                        let square = square
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(ident.semantic_id(), Role::Cell)
+                                    .parent(self.ident.semantic_id())
+                                    .text(label)
+                                    .value(value)
+                                    .selected(selected),
+                            )
+                            .flip_size(&handle, window, cx)
+                            .animate(enabled)
+                            .animation(timing);
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .items_start()
+                            .child(square)
+                    }))
+            })
+            .collect::<Vec<_>>();
+        let (exits, retained_height) =
+            layout
+                .borrow_mut()
+                .exits(matrix_bounds.get(), timing, enabled, &theme, window, cx);
+        let matrix = div()
+            .relative()
+            .column()
+            .gap_token(&theme, Space::Sm)
+            .min_h(px(retained_height))
+            .overflow_hidden()
+            .children(exits)
+            .child(header)
+            .children(rows)
+            .when(empty, |matrix| {
+                matrix.child(EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::ChartEmpty),
+                ))
+            })
+            .child(
+                gpui::canvas(
+                    move |bounds, window, _| {
+                        crate::layout::measure::record(&matrix_bounds, bounds, window)
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            );
         let [low, center, high] = self.scale.domain();
         let legend_id = self.ident.child("legend");
         let legend = div()
@@ -927,7 +1159,13 @@ impl RenderOnce for ContinuousHeatmap {
             );
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Table)
             .text(self.label.clone())
-            .value(if stale.is_some() { "stale" } else { "ready" });
+            .value(if stale.is_some() {
+                "stale"
+            } else if empty {
+                "empty"
+            } else {
+                "ready"
+            });
         if let Some(reason) = &stale {
             spec = spec.description(reason.clone());
         }
@@ -948,8 +1186,7 @@ impl RenderOnce for ContinuousHeatmap {
                             .text(reason),
                     )
             }))
-            .child(header)
-            .children(rows)
+            .child(matrix)
             .child(legend)
             .semantic_in(cx, spec)
             .into_any_element()

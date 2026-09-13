@@ -692,6 +692,7 @@ fn take_action(items: Vec<MenuItem>, path: &[usize]) -> Option<Box<dyn Action>> 
 pub(crate) struct TestAtlasState {
     next_id: u32,
     tiles: HashMap<AtlasKey, AtlasTile>,
+    leases: crate::AtlasLeaseRegistry,
 }
 
 pub(crate) struct TestAtlas(Mutex<TestAtlasState>);
@@ -701,11 +702,31 @@ impl TestAtlas {
         TestAtlas(Mutex::new(TestAtlasState {
             next_id: 0,
             tiles: HashMap::default(),
+            leases: Default::default(),
         }))
     }
 }
 
 impl PlatformAtlas for TestAtlas {
+    fn resource_revision(&self) -> u64 {
+        self.0.lock().leases.revision()
+    }
+
+    fn retain_tiles(self: Arc<Self>, tiles: &[AtlasTile]) -> Option<crate::AtlasLease> {
+        let mut lock = self.0.lock();
+        let atlas = self.clone();
+        lock.leases.pin_tiles(tiles, move |epoch, keys| {
+            let mut lock = atlas.0.lock();
+            let removed = lock.leases.release(epoch, keys);
+            for key in removed {
+                lock.leases.defer_remove(&key);
+                if let Some(tile) = lock.tiles.remove(&key) {
+                    lock.leases.remove_tile(tile);
+                }
+            }
+        })
+    }
+
     fn get_or_insert_with<'a>(
         &self,
         key: &crate::AtlasKey,
@@ -745,12 +766,19 @@ impl PlatformAtlas for TestAtlas {
             },
         );
 
-        Ok(Some(state.tiles[key]))
+        let tile = state.tiles[key];
+        state.leases.insert_tile(key.clone(), tile);
+        Ok(Some(tile))
     }
 
     fn remove(&self, key: &AtlasKey) {
         let mut state = self.0.lock();
-        state.tiles.remove(key);
+        if state.leases.defer_remove(key) {
+            return;
+        }
+        if let Some(tile) = state.tiles.remove(key) {
+            state.leases.remove_tile(tile);
+        }
     }
 
     fn contains(&self, key: &AtlasKey) -> bool {

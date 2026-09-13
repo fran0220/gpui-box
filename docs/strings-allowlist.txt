@@ -87,6 +87,8 @@ Emulator
 FALSE
 FailurePanel
 False
+Feature
+FeatureCollection
 FilterBar
 FindReplace
 FixtureTransport
@@ -101,6 +103,7 @@ Frost
 Glass
 GlassGroup
 GraphNode
+GraphSource
 Grid
 GridItem
 GridRow
@@ -129,6 +132,7 @@ Menu
 Menubar
 MessageList
 ModelViewer
+MultiPolygon
 MultiSelect
 NO
 NULL
@@ -162,6 +166,8 @@ PersonaDialogue
 Placed
 PlatformMediaTransport
 Plot
+Point
+Polygon
 Popover
 PresentationImage
 ProgressBar
@@ -254,13 +260,18 @@ Yes
 `{id}` names a parent `{parent}` that is absent
 a built source was just matched
 a cloned identity is empty
+a drawn state fade has a destination
 a keyframe list is never empty
 a new identity is empty
 a rich text document always has one block
 a rich-text block id cannot be empty
 a rich-text document needs one block
+a toolbar seat has a measurement
 ability charge maximum must be positive
 ability charges cannot exceed their maximum
+active geometry retained
+active group retained
+active point retained
 an actionable card has one
 an actionable row has one
 array
@@ -278,6 +289,8 @@ deferred List acceptance requires stable keys
 drop request identities exhausted
 empty array
 empty object
+enabled handler
+enabled range
 end before start
 error interval validated
 false
@@ -287,12 +300,16 @@ game fraction must be finite
 glTF
 handled before mutation
 heatmap error key
+heatmap frame begun
+hit names source geometry
 identity segments are valid UTF-8
 indexed syntax row
+known ancestor
 layout came from projected document
 layout is present until paint
 listed row
 markdown stream closed `{end:?}` past its root
+matching shape
 monotone guard checked tangents
 month unknown
 more than one root: {}
@@ -316,6 +333,7 @@ panel `{id}` appears more than once
 plain text
 platform
 policy-owned particle recipes must remain valid
+projected selection
 radial axis identities validated
 raw pie readings validated
 raw x validated
@@ -329,6 +347,7 @@ rich-text block id `{id}` is repeated
 row keys must be unique
 series axis validated
 series is nonempty
+settled projection retained
 slot was filled
 soft break
 source line index
@@ -356,6 +375,8 @@ validated legend
 validated reading
 validated reference endpoint
 validated selected detent
+validated source
+validated target
 visible series are drawn by the caller
 voice {field} {reason}
 withheld

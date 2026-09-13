@@ -2,6 +2,73 @@
 use super::support::*;
 use crate::display::plot::{SankeyAlignment, SankeyOrder};
 
+#[derive(Default)]
+struct FlowRevisions {
+    revision: usize,
+    direct: bool,
+    selected: Option<SharedString>,
+}
+
+pub(super) fn sankey_motion(window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let state = crate::motion::keyed::slot::<FlowRevisions>(
+        &"scene.sankey.motion-state".into(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let revision = state.borrow().revision % 3;
+    let flows = if revision == 0 {
+        vec![("ad", "a", "d", 70.0), ("bc", "b", "c", 30.0)]
+    } else if revision == 1 {
+        vec![("ad", "a", "d", 20.0), ("bc", "b", "c", 80.0)]
+    } else {
+        vec![("ad", "a", "d", 45.0)]
+    };
+    let mut nodes = Vec::new();
+    let mut links = Vec::new();
+    let mut weights = Vec::new();
+    for (id, source, target, value) in flows {
+        for node in [source, target] {
+            nodes.push(SankeyNode::new(
+                node,
+                node,
+                value.to_string(),
+                Default::default(),
+            ));
+        }
+        links.push(SankeyLink::new(
+            id,
+            source,
+            target,
+            format!("{source} → {target}"),
+            value.to_string(),
+            Default::default(),
+            Default::default(),
+            0.0,
+        ));
+        weights.push(value);
+    }
+    let (data, _) = SankeyData::new(nodes, links)
+        .layout_ordered(
+            &weights,
+            0.08,
+            0.1,
+            SankeyAlignment::Left,
+            SankeyOrder::Barycenter,
+        )
+        .expect("conserved synthetic flow");
+    let next = state.clone();
+    let direct = state.clone();
+    let select = state.clone();
+    stack(&theme).w(px(600.0)).child(caption(&theme,"Synthetic conserved endpoint layouts · ribbons remain attached during motion; exact current values"))
+        .child(div().row().gap_token(&theme,Space::Sm)
+            .child(Button::new("scene.sankey.motion.advance").label("Advance flows").on_click(move |window,_|{next.borrow_mut().revision+=1;window.refresh();}))
+            .child(Button::new("scene.sankey.motion.direct").label(if state.borrow().direct {"Enable animation"} else {"Direct updates"}).on_click(move |window,_|{let mut s=direct.borrow_mut();s.direct = !s.direct;window.refresh();})))
+        .child(SankeyChart::new("scene.sankey.motion","Keyed node and ribbon updates",PlotState::Ready(data)).animate(!state.borrow().direct).labels(true)
+            .selected(state.borrow().selected.clone()).on_current(move |id,window,_|{select.borrow_mut().selected=Some(id);window.refresh();}))
+        .into_any_element()
+}
+
 pub(super) fn sankey_layout(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let graph = SankeyData::new(

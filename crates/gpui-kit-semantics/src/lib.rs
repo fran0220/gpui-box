@@ -14,6 +14,9 @@ use gpui::{
 };
 use serde::{Deserialize, Serialize};
 
+mod measured;
+pub use measured::{MeasuredLeaf, MeasuredLeafBatch, MeasuredLeafRole};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Role {

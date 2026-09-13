@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, ParentElement, PathBuilder,
-    Pixels, Point, RenderOnce, SharedString, Styled, Window, bounds, canvas, div, fill, point,
-    prelude::FluentBuilder, px, relative, size,
+    Pixels, Point, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, bounds,
+    canvas, div, fill, point, prelude::FluentBuilder, px, relative, size,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
@@ -30,6 +30,24 @@ use crate::strings::{ActiveStrings, StringKey};
 const PLOT_HEIGHT: f32 = 220.0;
 /// Flow ribbons remain behind the nodes and are intentionally translucent.
 const SANKEY_LINK_ALPHA: f32 = 0.42;
+
+#[path = "plot_labels.rs"]
+mod labels;
+#[path = "sankey_motion.rs"]
+mod sankey_motion;
+#[path = "sankey_order.rs"]
+mod sankey_order;
+
+/// A visualization timing change starts from the currently displayed value,
+/// rather than reinterpreting elapsed time with a different easing function.
+pub(super) fn retime<T: crate::motion::Interpolate + PartialEq>(
+    value: &mut crate::motion::Transition<T>,
+    spec: crate::motion::MotionSpec,
+) {
+    let target = value.target();
+    *value = crate::motion::Transition::new(value.value(), spec);
+    value.set(target);
+}
 
 /// Loading and refresh truth for arbitrary caller-owned plot data.
 #[derive(Debug, Clone, PartialEq)]
@@ -192,6 +210,19 @@ pub struct Plot {
     painter: Option<PlotPainter>,
     current: Option<SharedString>,
     on_current: Option<CurrentHandler>,
+    exploration: PlotExploration,
+}
+
+type PlotPicker = Rc<dyn Fn(Point<f32>, Bounds<Pixels>) -> Option<SharedString>>;
+type PlotHover = Rc<dyn Fn(Option<SharedString>, &mut Window, &mut App)>;
+
+#[derive(Default)]
+struct PlotExploration {
+    picker: Option<PlotPicker>,
+    controlled: bool,
+    hover: Option<PlotHover>,
+    labels: bool,
+    empty_decoration: bool,
 }
 
 impl std::fmt::Debug for Plot {
@@ -221,11 +252,52 @@ impl Plot {
             painter: None,
             current: None,
             on_current: None,
+            exploration: PlotExploration::default(),
         }
+    }
+
+    /// Caller-controlled selection, including an explicitly empty selection.
+    /// Keyboard and pointer gestures emit proposals without accepting them.
+    pub fn selected(mut self, id: Option<SharedString>) -> Self {
+        self.current = id;
+        self.exploration.controlled = true;
+        self
+    }
+
+    /// Exact picking in normalized plot coordinates and the current measured
+    /// pixel frame. Only identities present in the current semantic marks may
+    /// be returned; decorative exiting geometry cannot become interactive.
+    pub fn hit_test(
+        mut self,
+        picker: impl Fn(Point<f32>, Bounds<Pixels>) -> Option<SharedString> + 'static,
+    ) -> Self {
+        self.exploration.picker = Some(Rc::new(picker));
+        self
+    }
+
+    /// Reports geometric hover separately from selection, including departure.
+    pub fn on_hover(
+        mut self,
+        handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.exploration.hover = Some(Rc::new(handler));
+        self
     }
 
     pub fn paint(mut self, painter: impl Fn(PlotFrame, &mut Window, &mut App) + 'static) -> Self {
         self.painter = Some(Rc::new(painter));
+        self
+    }
+
+    /// Measured nonoverlapping labels with leader lines. Crowded labels are
+    /// suppressed, never used as substitute hit regions; exact readouts remain.
+    pub fn labels(mut self, enabled: bool) -> Self {
+        self.exploration.labels = enabled;
+        self
+    }
+
+    pub(crate) fn empty_decoration(mut self, enabled: bool) -> Self {
+        self.exploration.empty_decoration = enabled;
         self
     }
 
@@ -248,6 +320,8 @@ struct PlotInteraction {
     initialized: bool,
     declared: Option<SharedString>,
     current: Option<SharedString>,
+    hovered: Option<SharedString>,
+    focus: Option<gpui::FocusHandle>,
 }
 
 impl RenderOnce for Plot {
@@ -267,6 +341,7 @@ impl RenderOnce for Plot {
                         self.painter,
                         self.current,
                         self.on_current,
+                        self.exploration,
                         &theme,
                         window,
                         cx,
@@ -289,6 +364,7 @@ impl RenderOnce for Plot {
                         self.painter,
                         self.current,
                         self.on_current,
+                        self.exploration,
                         &theme,
                         window,
                         cx,
@@ -300,7 +376,18 @@ impl RenderOnce for Plot {
                         .range(0.0, count as f32, count as f32),
                 )
             }
-            state => non_ready_plot(&self.ident, &self.label, state, &theme, cx),
+            state => {
+                let decorate =
+                    matches!(state, PlotState::Empty) && self.exploration.empty_decoration;
+                non_ready_plot(
+                    &self.ident,
+                    &self.label,
+                    state,
+                    &theme,
+                    self.painter.filter(|_| decorate),
+                    cx,
+                )
+            }
         };
         div()
             .w_full()
@@ -327,6 +414,7 @@ fn ready_plot(
     painter: Option<PlotPainter>,
     declared: Option<SharedString>,
     report: Option<CurrentHandler>,
+    exploration: PlotExploration,
     theme: &Theme,
     window: &Window,
     cx: &mut App,
@@ -336,23 +424,43 @@ fn ready_plot(
         window.window_handle().window_id(),
         cx,
     );
+    let focus = interaction
+        .borrow_mut()
+        .focus
+        .get_or_insert_with(|| cx.focus_handle().tab_stop(true).tab_index(0))
+        .clone();
     {
         let mut state = interaction.borrow_mut();
-        if !state.initialized || state.declared != declared {
-            state.current = declared.clone();
+        if exploration.controlled || !state.initialized || state.declared != declared {
+            state.current = declared
+                .clone()
+                .filter(|id| marks.iter().any(|m| &m.id == id));
             state.declared = declared;
             state.initialized = true;
         }
-        if state
-            .current
-            .as_ref()
-            .is_none_or(|id| !marks.iter().any(|mark| &mark.id == id))
+        if !exploration.controlled
+            && state
+                .current
+                .as_ref()
+                .is_none_or(|id| !marks.iter().any(|mark| &mark.id == id))
         {
             state.current = marks.first().map(|mark| mark.id.clone());
         }
+        if state
+            .hovered
+            .as_ref()
+            .is_some_and(|id| !marks.iter().any(|m| &m.id == id))
+        {
+            state.hovered = None;
+        }
     }
     let current = interaction.borrow().current.clone();
-    let readout = current
+    let reading = interaction
+        .borrow()
+        .hovered
+        .clone()
+        .or_else(|| current.clone());
+    let readout = reading
         .as_ref()
         .and_then(|id| marks.iter().find(|mark| &mark.id == id))
         .map(|mark| {
@@ -366,6 +474,8 @@ fn ready_plot(
         });
 
     let plot_id = ident.child("plot");
+    let measured = crate::layout::measure::cell(&plot_id.semantic_id(), window, cx);
+    let prepaint_bounds = measured.clone();
     let mut plot = div()
         .id(plot_id.element_id())
         .relative()
@@ -374,6 +484,16 @@ fn ready_plot(
         .overflow_hidden()
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Canvas)
+        .child(
+            canvas(
+                move |frame, window, _| {
+                    crate::layout::measure::record(&prepaint_bounds, frame, window);
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .size_full(),
+        )
         .children(painter.map(|painter| {
             canvas(
                 |_, _, _| {},
@@ -402,18 +522,177 @@ fn ready_plot(
                     .read_only(true),
                 )
         }));
+    if exploration.labels {
+        let frame = measured.get();
+        let frame_size = size(f32::from(frame.size.width), f32::from(frame.size.height));
+        let style = theme.type_style(TypeScale::Caption);
+        let mut font = window.text_style().font();
+        font.weight = gpui::FontWeight(style.weight);
+        font.fallbacks = Some(gpui_kit_assets::text_fallbacks());
+        let mut occupied = Vec::new();
+        let mut ordered: Vec<_> = marks.iter().collect();
+        ordered.sort_by(|a, b| {
+            (reading.as_ref() != Some(&a.id))
+                .cmp(&(reading.as_ref() != Some(&b.id)))
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        for mark in ordered {
+            let text: SharedString = format!("{}: {}", mark.label, mark.value).into();
+            let width = f32::from(
+                window
+                    .text_system()
+                    .shape_line(
+                        text.clone(),
+                        px(style.size),
+                        &[gpui::TextRun {
+                            len: text.len(),
+                            font: font.clone(),
+                            color: theme.colors.text,
+                            ..Default::default()
+                        }],
+                        None,
+                    )
+                    .width,
+            );
+            let anchor = point(
+                (mark.bounds.origin.x + mark.bounds.size.width / 2.0) * frame_size.width,
+                (mark.bounds.origin.y + mark.bounds.size.height / 2.0) * frame_size.height,
+            );
+            if let Some(placed) = labels::place(
+                anchor,
+                size(width.ceil(), style.line_height),
+                frame_size,
+                &occupied,
+                theme.space(Space::Xs),
+            ) {
+                occupied.push(placed);
+                let center = point(
+                    placed.origin.x + placed.size.width / 2.0,
+                    placed.origin.y + placed.size.height / 2.0,
+                );
+                let tint = theme.colors.text_muted;
+                let stroke = theme.borders.hairline;
+                plot = plot
+                    .child(
+                        canvas(
+                            |_, _, _| {},
+                            move |bounds, _, window, _| {
+                                let mut path = PathBuilder::stroke(px(stroke));
+                                path.move_to(bounds.origin + point(px(anchor.x), px(anchor.y)));
+                                path.line_to(bounds.origin + point(px(center.x), px(center.y)));
+                                if let Ok(path) = path.build() {
+                                    window.paint_path(path, tint);
+                                }
+                            },
+                        )
+                        .absolute()
+                        .size_full(),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(placed.origin.x))
+                            .top(px(placed.origin.y))
+                            .w(px(placed.size.width))
+                            .h(px(placed.size.height))
+                            .bg(theme.colors.canvas)
+                            .type_scale(theme, TypeScale::Caption)
+                            .whitespace_nowrap()
+                            .child(text.clone())
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(
+                                    plot_id.child("label").child(mark.id.as_ref()).semantic_id(),
+                                    Role::Image,
+                                )
+                                .text(text),
+                            ),
+                    );
+            }
+        }
+    }
+    if let Some(picker) = exploration.picker {
+        let pointer_marks = Rc::new(marks.clone());
+        let pick = Rc::new(move |position: Point<Pixels>| {
+            let frame = measured.get();
+            if !frame.contains(&position)
+                || frame.size.width <= px(0.0)
+                || frame.size.height <= px(0.0)
+            {
+                return None;
+            }
+            let p = point(
+                (position.x - frame.origin.x) / frame.size.width,
+                (position.y - frame.origin.y) / frame.size.height,
+            );
+            picker(p, frame).filter(|id| pointer_marks.iter().any(|mark| &mark.id == id))
+        });
+        let move_pick = pick.clone();
+        let move_state = interaction.clone();
+        let hover_report = exploration.hover.clone();
+        let leave_state = interaction.clone();
+        let leave_report = exploration.hover;
+        let click_state = interaction.clone();
+        let click_report = report.clone();
+        let click_focus = focus.clone();
+        plot = plot
+            .on_mouse_move(move |event, window, cx| {
+                let hovered = move_pick(event.position);
+                if move_state.borrow().hovered != hovered {
+                    move_state.borrow_mut().hovered = hovered.clone();
+                    if let Some(report) = &hover_report {
+                        report(hovered, window, cx);
+                    }
+                    window.refresh();
+                }
+            })
+            .on_hover(move |over, window, cx| {
+                if !over && leave_state.borrow_mut().hovered.take().is_some() {
+                    if let Some(report) = &leave_report {
+                        report(None, window, cx);
+                    }
+                    window.refresh();
+                }
+            })
+            .on_mouse_down(gpui::MouseButton::Left, move |event, window, cx| {
+                if let Some(id) = pick(event.position) {
+                    // Picking stops bubbling before Div's default focus listener.
+                    window.focus_from_pointer(&click_focus, cx);
+                    if !exploration.controlled {
+                        click_state.borrow_mut().current = Some(id.clone());
+                    }
+                    if let Some(report) = &click_report {
+                        report(id, window, cx);
+                    }
+                    window.refresh();
+                    cx.stop_propagation();
+                }
+            });
+        if let Some(mark) = reading
+            .as_ref()
+            .and_then(|id| marks.iter().find(|mark| &mark.id == id))
+        {
+            plot = plot.tip(
+                plot_id.child("readout"),
+                format!("{}: {}", mark.label, mark.value),
+            );
+        }
+    }
     if !marks.is_empty() {
         let key_marks = Rc::new(marks);
         let key_state = Rc::clone(&interaction);
         plot = plot
             .tab_index(0)
+            .track_focus(&focus)
             .focus_ring(theme)
             .on_key_down(move |event, window, cx| {
                 let current = key_state.borrow().current.clone();
                 if let Some(next) = step_mark(&key_marks, current.as_ref(), &event.keystroke.key) {
                     let changed = key_state.borrow().current.as_ref() != Some(&next);
                     if changed {
-                        key_state.borrow_mut().current = Some(next.clone());
+                        if !exploration.controlled {
+                            key_state.borrow_mut().current = Some(next.clone());
+                        }
                         if let Some(report) = &report {
                             report(next, window, cx);
                         }
@@ -478,12 +757,10 @@ fn step_mark(
     if marks.is_empty() {
         return None;
     }
-    let place = current
-        .and_then(|id| marks.iter().position(|mark| &mark.id == id))
-        .unwrap_or_default();
+    let place = current.and_then(|id| marks.iter().position(|mark| &mark.id == id));
     let next = match key {
-        "left" | "up" => place.saturating_sub(1),
-        "right" | "down" => (place + 1).min(marks.len() - 1),
+        "left" | "up" => place.unwrap_or(0).saturating_sub(1),
+        "right" | "down" => place.map(|p| (p + 1).min(marks.len() - 1)).unwrap_or(0),
         "home" => 0,
         "end" => marks.len() - 1,
         _ => return None,
@@ -496,6 +773,7 @@ fn non_ready_plot<T>(
     label: &SharedString,
     state: PlotState<T>,
     theme: &Theme,
+    decoration: Option<PlotPainter>,
     cx: &mut App,
 ) -> (AnyElement, NodeSpec) {
     let name = state.name();
@@ -559,6 +837,20 @@ fn non_ready_plot<T>(
                     .h(px(PLOT_HEIGHT))
                     .radius(theme, Radius::Small)
                     .surface(theme, Surface::Canvas)
+                    .relative()
+                    .overflow_hidden()
+                    .when_some(decoration, |panel, painter| {
+                        panel.child(
+                            canvas(
+                                |_, _, _| {},
+                                move |frame, _, window, cx| {
+                                    painter(PlotFrame::new(frame), window, cx);
+                                },
+                            )
+                            .absolute()
+                            .size_full(),
+                        )
+                    })
                     .child(body),
             )
             .into_any_element(),
@@ -969,9 +1261,10 @@ pub enum SankeyAlignment {
     Justify,
 }
 
-/// Vertical ordering policy. Weighted barycenter sweeps reduce crossings;
-/// stable identity breaks ties. This is a deterministic heuristic, not a
-/// guarantee of the globally minimum crossing arrangement.
+/// Vertical ordering policy. Weighted barycenter sweeps and bounded adjacent
+/// transpositions retain the best weighted crossing score, including skip-layer
+/// links. Stable identity breaks ties. This heuristic is not a global optimum;
+/// refinement costs O(V E²), intended for overview-sized flows, not huge DAGs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SankeyOrder {
     #[default]
@@ -996,6 +1289,57 @@ pub enum SankeyLayoutError {
 }
 
 impl SankeyData {
+    /// Exact normalized ribbon/node picking. Nodes are above ribbons, later
+    /// paint wins, and Bézier edges use the same control points as the painter.
+    /// Returned identities match `node.<id>` / `link.<id>` semantic marks.
+    pub fn hit_test(&self, p: Point<f32>) -> Option<SharedString> {
+        if !p.x.is_finite()
+            || !p.y.is_finite()
+            || !(0.0..=1.0).contains(&p.x)
+            || !(0.0..=1.0).contains(&p.y)
+        {
+            return None;
+        }
+        for node in self.nodes.iter().rev() {
+            if node.bounds.size.width > 0.0
+                && node.bounds.size.height > 0.0
+                && node.bounds.contains(&p)
+            {
+                return Some(Ident::new("node").child(node.id.as_ref()).semantic_id());
+            }
+        }
+        for link in self.links.iter().rev() {
+            if p.x < link.start.x
+                || p.x > link.end.x
+                || link.start.x >= link.end.x
+                || link.start_width <= 0.0
+                || link.end_width <= 0.0
+            {
+                continue;
+            }
+            let x = (p.x - link.start.x) / (link.end.x - link.start.x);
+            let mut low = 0.0f32;
+            let mut high = 1.0f32;
+            for _ in 0..24 {
+                let t = (low + high) / 2.0;
+                let curve = 1.5 * (1.0 - t) * t + t * t * t;
+                if curve < x {
+                    low = t;
+                } else {
+                    high = t;
+                }
+            }
+            let t = (low + high) / 2.0;
+            let smooth = t * t * (3.0 - 2.0 * t);
+            let center = link.start.y * (1.0 - smooth) + link.end.y * smooth;
+            let width = link.start_width * (1.0 - smooth) + link.end_width * smooth;
+            if (p.y - center).abs() <= width / 2.0 {
+                return Some(Ident::new("link").child(link.id.as_ref()).semantic_id());
+            }
+        }
+        None
+    }
+
     pub fn new(
         nodes: impl IntoIterator<Item = SankeyNode>,
         links: impl IntoIterator<Item = SankeyLink>,
@@ -1082,6 +1426,16 @@ impl SankeyData {
             }
             edges.push((source, target));
         }
+        let mut canonical: Vec<_> = (0..edges.len()).collect();
+        canonical.sort_by(|&a, &b| self.links[a].id.cmp(&self.links[b].id));
+        let sweep_edges: Vec<_> = canonical.iter().map(|&i| edges[i]).collect();
+        let sweep_weights: Vec<_> = canonical.iter().map(|&i| weights[i]).collect();
+        incoming_value.fill(0.0);
+        outgoing_value.fill(0.0);
+        for (&(a, b), &weight) in sweep_edges.iter().zip(&sweep_weights) {
+            incoming_value[b] += weight;
+            outgoing_value[a] += weight;
+        }
         let mut queue: VecDeque<_> = (0..n).filter(|&i| indegree[i] == 0).collect();
         let mut order = Vec::new();
         let mut depth = vec![0usize; n];
@@ -1134,6 +1488,8 @@ impl SankeyData {
             for column in &mut columns {
                 column.sort_by(|&a, &b| self.nodes[a].id.cmp(&self.nodes[b].id));
             }
+            let mut best = columns.clone();
+            let mut best_cost = sankey_order::cost(&columns, &depth, &sweep_edges, &sweep_weights);
             let mut rank = vec![0.0; n];
             for pass in 0..6 {
                 for column in &columns {
@@ -1157,9 +1513,9 @@ impl SankeyData {
                         if total == 0.0 {
                             return rank[i];
                         }
-                        edges
+                        sweep_edges
                             .iter()
-                            .zip(weights)
+                            .zip(&sweep_weights)
                             .filter_map(|(&(a, b), &weight)| {
                                 if forward && b == i {
                                     Some(rank[a] * (weight / total))
@@ -1180,7 +1536,14 @@ impl SankeyData {
                         rank[i] = position as f64;
                     }
                 }
+                sankey_order::transpose(&mut columns, &depth, &sweep_edges, &sweep_weights);
+                let cost = sankey_order::cost(&columns, &depth, &sweep_edges, &sweep_weights);
+                if cost < best_cost {
+                    best_cost = cost;
+                    best = columns.clone();
+                }
             }
+            columns = best;
         }
         let mut scale = f64::INFINITY;
         for column in &columns {
@@ -1283,6 +1646,9 @@ pub struct SankeyChart {
     show_labels: bool,
     current: Option<SharedString>,
     on_current: Option<CurrentHandler>,
+    animate: bool,
+    animation: Option<crate::motion::MotionSpec>,
+    controlled: bool,
 }
 
 impl std::fmt::Debug for SankeyChart {
@@ -1311,7 +1677,30 @@ impl SankeyChart {
             show_labels: false,
             current: None,
             on_current: None,
+            animate: false,
+            animation: None,
+            controlled: false,
         }
+    }
+
+    /// Opt into keyed node/ribbon motion on this legacy normalized renderer.
+    /// Endpoints stay attached to displayed nodes; raw readouts never tween.
+    pub fn animate(mut self, enabled: bool) -> Self {
+        self.animate = enabled;
+        self
+    }
+
+    /// Override theme timing. Reduced motion and animate(false) still settle.
+    pub fn animation(mut self, spec: crate::motion::MotionSpec) -> Self {
+        self.animation = Some(spec);
+        self
+    }
+
+    /// Controlled selection; refusing proposals preserves the accepted value.
+    pub fn selected(mut self, id: Option<SharedString>) -> Self {
+        self.current = id;
+        self.controlled = true;
+        self
     }
 
     /// Show a persistent node/link key with caller-provided labels and values.
@@ -1335,11 +1724,41 @@ impl SankeyChart {
 }
 
 impl RenderOnce for SankeyChart {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let visible = self.state.visible().map(|(data, _)| valid_sankey(data));
-        let marks = self.state.map(|data| sankey_marks(&valid_sankey(&data)));
-        let data = visible.unwrap_or_default();
+        let motion = keyed::slot::<sankey_motion::FlowMotion>(
+            &self.ident.child("flow-motion").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        if self.state.visible().is_none() {
+            *motion.borrow_mut() = sankey_motion::FlowMotion::default();
+        }
+        let mut painted = SankeyData::default();
+        let state = self.state.map(|data| {
+            let mut data = valid_sankey(&data);
+            let spec = self.animation.unwrap_or_else(|| {
+                crate::motion::MotionPolicy::resolve(crate::motion::MotionRole::Resize, cx).spec()
+            });
+            painted = motion.borrow_mut().animate(
+                &mut data,
+                spec,
+                self.animate,
+                theme.colors.accent,
+                window,
+                cx,
+            );
+            data
+        });
+        let data = state
+            .visible()
+            .map(|(data, _)| data.clone())
+            .unwrap_or_default();
+        let marks = match state.map(|data| sankey_marks(&data)) {
+            PlotState::Ready(marks) if marks.is_empty() => PlotState::Empty,
+            state => state,
+        };
+        let picking = data.clone();
         let accent = theme.colors.accent;
         let labels = if self.show_labels {
             sankey_marks(&data)
@@ -1353,8 +1772,14 @@ impl RenderOnce for SankeyChart {
             .gap_token(&theme, Space::Xs)
             .child(
                 Plot::new(self.ident, self.label, marks)
-                    .paint(move |frame, window, _| paint_sankey(frame, &data, accent, window))
-                    .when_some(self.current, |plot, current| plot.current(current))
+                    .labels(self.show_labels)
+                    .empty_decoration(!painted.nodes.is_empty())
+                    .hit_test(move |p, _| picking.hit_test(p))
+                    .paint(move |frame, window, _| paint_sankey(frame, &painted, accent, window))
+                    .when(self.controlled, |plot| plot.selected(self.current.clone()))
+                    .when(!self.controlled, |plot| {
+                        plot.when_some(self.current, |plot, current| plot.current(current))
+                    })
                     .when_some(self.on_current, |plot, report| {
                         plot.on_current(move |id, window, cx| report(id, window, cx))
                     }),
@@ -1489,6 +1914,139 @@ fn paint_sankey(frame: PlotFrame, data: &SankeyData, accent: Hsla, window: &mut 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn decorative_exit_uses_the_plot_frame_not_the_title(cx: &mut gpui::TestAppContext) {
+        use std::cell::RefCell;
+        let empty = Rc::new(RefCell::new(false));
+        let painted = Rc::new(RefCell::new(None));
+        let input = empty.clone();
+        let output = painted.clone();
+        let mut h = gpui_kit_testkit::harness::Harness::new(cx, crate::install, move |_, _| {
+            let output = output.clone();
+            div()
+                .w(px(320.0))
+                .child(
+                    Plot::new(
+                        "exit-frame",
+                        "Measurements",
+                        if *input.borrow() {
+                            PlotState::Empty
+                        } else {
+                            PlotState::Ready(vec![PlotMark::new(
+                                "a",
+                                "A",
+                                "7",
+                                bounds(point(0.0, 0.0), size(1.0, 1.0)),
+                            )])
+                        },
+                    )
+                    .selected(None)
+                    .empty_decoration(true)
+                    .paint(move |frame, _, _| *output.borrow_mut() = Some(frame.bounds())),
+                )
+                .into_any_element()
+        });
+        h.snapshot();
+        let ready = painted.borrow().expect("ready painter frame");
+        *empty.borrow_mut() = true;
+        let snapshot = h.snapshot();
+        let exit = painted.borrow().expect("exit painter frame");
+        assert_eq!(ready, exit);
+        assert_eq!(exit.size.height, px(PLOT_HEIGHT));
+        assert!(snapshot.under("exit-frame.mark.").is_empty());
+    }
+
+    #[test]
+    fn ribbon_picker_uses_bezier_edges_not_the_enclosing_rectangle() {
+        let data = SankeyData::new(
+            [],
+            [SankeyLink::new(
+                "curve",
+                "a",
+                "b",
+                "Curve",
+                "5",
+                point(0.1, 0.2),
+                point(0.9, 0.8),
+                0.1,
+            )
+            .widths(0.1, 0.2)],
+        );
+        // Independent cubic evaluation at t=1/4: x=.3375, center=.29375,
+        // half-width=.0578125. The broad envelope also contains (.5,.2).
+        assert_eq!(
+            data.hit_test(point(0.3375, 0.29375)).as_deref(),
+            Some("link.curve")
+        );
+        assert_eq!(
+            data.hit_test(point(0.3375, 0.3515)).as_deref(),
+            Some("link.curve")
+        );
+        assert_eq!(data.hit_test(point(0.3375, 0.3517)), None);
+        assert_eq!(data.hit_test(point(0.5, 0.2)), None);
+    }
+
+    #[test]
+    fn refined_flow_is_identity_deterministic_and_every_ribbon_conserves_width() {
+        let graph = SankeyData::new(
+            ["a", "b", "m", "n", "x", "y"].map(|id| SankeyNode::new(id, id, "", Bounds::default())),
+            [
+                ("am", "a", "m"),
+                ("an", "a", "n"),
+                ("bm", "b", "m"),
+                ("ny", "n", "y"),
+                ("mx", "m", "x"),
+                ("by", "b", "y"),
+            ]
+            .map(|(id, a, b)| {
+                SankeyLink::new(id, a, b, id, "", Point::default(), Point::default(), 0.0)
+            }),
+        );
+        let weights = [8.0, 3.0, 5.0, 3.0, 13.0, 2.0];
+        let (a, scale) = graph
+            .clone()
+            .layout_ordered(
+                &weights,
+                0.08,
+                0.05,
+                SankeyAlignment::Left,
+                SankeyOrder::Barycenter,
+            )
+            .expect("flow");
+        let mut shuffled = graph;
+        shuffled.nodes.reverse();
+        shuffled.links.reverse();
+        let reversed: Vec<_> = weights.into_iter().rev().collect();
+        let (b, scale_b) = shuffled
+            .layout_ordered(
+                &reversed,
+                0.08,
+                0.05,
+                SankeyAlignment::Left,
+                SankeyOrder::Barycenter,
+            )
+            .expect("permuted flow");
+        assert_eq!(scale, scale_b);
+        for node in &a.nodes {
+            assert_eq!(Some(node), b.nodes.iter().find(|other| other.id == node.id));
+        }
+        for (link, weight) in a.links.iter().zip(weights) {
+            assert_eq!(Some(link), b.links.iter().find(|other| other.id == link.id));
+            assert_eq!(link.start_width, link.end_width);
+            assert!((f64::from(link.start_width) - weight * scale).abs() < 1e-7);
+            let source = a
+                .nodes
+                .iter()
+                .find(|n| n.id == link.source)
+                .expect("source");
+            assert!(link.start.y - link.start_width / 2.0 >= source.bounds.origin.y - 1e-6);
+            assert!(
+                link.start.y + link.start_width / 2.0
+                    <= source.bounds.origin.y + source.bounds.size.height + 1e-6
+            );
+        }
+    }
 
     #[test]
     fn raw_ohlc_adapts_all_endpoints_without_normalizing_or_reordering_values() {

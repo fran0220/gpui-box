@@ -8,8 +8,8 @@
 //!
 //! # How it decides
 //!
-//! It reads every component source, drops comments and everything from the
-//! first `#[cfg(test)]`, and pulls out the string literals that are left. A
+//! It reads every component source, drops comments and syntax excluded from
+//! non-test builds by `cfg(test)`, and pulls out the string literals that remain. A
 //! literal is *suspect* when either is true:
 //!
 //! 1. it reads like a sentence — it has a letter, and either a space or a
@@ -48,6 +48,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use syn::{spanned::Spanned, visit::Visit};
 
 /// Sources whose literals are not component copy.
 ///
@@ -57,17 +58,10 @@ use anyhow::{Result, bail};
 /// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
-/// - `interaction/mobile_tests.rs` and `display/chart/cartesian_tests.rs`
-///   are external `#[cfg(test)]` modules; their labels and assertions belong
-///   to test fixtures, not component copy. Keep this explicit rather than
-///   exempting any production file that happens to have a test-like name.
-const EXEMPT: &[&str] = &[
-    "strings.rs",
-    "strings/packs.rs",
-    "datetime/fixture.rs",
-    "interaction/mobile_tests.rs",
-    "display/chart/cartesian_tests.rs",
-];
+///
+/// External test modules are excluded from their parsed declarations, not
+/// their filenames. A production declaration of the same file vetoes exclusion.
+const EXEMPT: &[&str] = &["strings.rs", "strings/packs.rs", "datetime/fixture.rs"];
 
 /// Directories whose literals are not component copy either.
 const EXEMPT_TREES: &[&str] = &["scenes/"];
@@ -183,8 +177,26 @@ fn scan(directory: &Path) -> Result<Vec<Suspect>> {
     collect(directory, &mut sources)?;
     sources.sort();
 
+    let mut test_modules = BTreeSet::new();
+    let mut production_modules = BTreeSet::new();
+    for path in &sources {
+        for (module, test_only) in external_modules(path, &fs::read_to_string(path)?) {
+            let Ok(module) = module.canonicalize() else {
+                continue;
+            };
+            if test_only {
+                test_modules.insert(module);
+            } else {
+                production_modules.insert(module);
+            }
+        }
+    }
     let mut found = Vec::new();
     for path in sources {
+        let canonical = path.canonicalize()?;
+        if test_modules.contains(&canonical) && !production_modules.contains(&canonical) {
+            continue;
+        }
         let relative = path
             .strip_prefix(directory)
             .unwrap_or(&path)
@@ -205,6 +217,84 @@ fn scan(directory: &Path) -> Result<Vec<Suspect>> {
     Ok(found)
 }
 
+/// Resolve ordinary external module declarations, including inline ancestors
+/// and literal `#[path]` overrides. Unknown cfg branches remain production.
+fn external_modules(path: &Path, source: &str) -> Vec<(PathBuf, bool)> {
+    let Ok(file) = syn::parse_file(source) else {
+        return Vec::new();
+    };
+    struct Modules {
+        directory: PathBuf,
+        explicit_directory: PathBuf,
+        test_only: bool,
+        found: Vec<(PathBuf, bool)>,
+    }
+    impl<'ast> Visit<'ast> for Modules {
+        fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+            let test_only = self.test_only
+                || node.attrs.iter().any(|attr| {
+                    attr.path().is_ident("cfg")
+                        && attr
+                            .parse_args::<syn::Meta>()
+                            .is_ok_and(|condition| non_test_condition(&condition) == Some(false))
+                });
+            if node.content.is_some() {
+                // Nonstandard inline path scopes remain scanned conservatively.
+                if node.attrs.iter().any(|attr| attr.path().is_ident("path")) {
+                    return;
+                }
+                let directory = self.directory.clone();
+                let explicit_directory = self.explicit_directory.clone();
+                let previous = self.test_only;
+                self.directory.push(node.ident.to_string());
+                self.explicit_directory = self.directory.clone();
+                self.test_only = test_only;
+                syn::visit::visit_item_mod(self, node);
+                self.directory = directory;
+                self.explicit_directory = explicit_directory;
+                self.test_only = previous;
+            } else {
+                let explicit = node.attrs.iter().find_map(|attr| {
+                    if attr.path().is_ident("path")
+                        && let syn::Meta::NameValue(value) = &attr.meta
+                        && let syn::Expr::Lit(value) = &value.value
+                        && let syn::Lit::Str(value) = &value.lit
+                    {
+                        Some(value.value())
+                    } else {
+                        None
+                    }
+                });
+                let candidates = if let Some(explicit) = explicit {
+                    vec![self.explicit_directory.join(explicit)]
+                } else {
+                    vec![
+                        self.directory.join(format!("{}.rs", node.ident)),
+                        self.directory.join(node.ident.to_string()).join("mod.rs"),
+                    ]
+                };
+                self.found
+                    .extend(candidates.into_iter().map(|path| (path, test_only)));
+            }
+        }
+    }
+    let mut directory = path.parent().unwrap_or(Path::new("")).to_path_buf();
+    if !matches!(
+        path.file_stem().and_then(|stem| stem.to_str()),
+        Some("lib" | "main" | "mod")
+    ) {
+        directory.push(path.file_stem().unwrap_or_default());
+    }
+    let mut modules = Modules {
+        directory,
+        explicit_directory: path.parent().unwrap_or(Path::new("")).to_path_buf(),
+        test_only: false,
+        found: Vec::new(),
+    };
+    modules.visit_file(&file);
+    modules.found
+}
+
 pub(crate) fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();
@@ -219,15 +309,103 @@ pub(crate) fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
 
 /// Every suspect literal in one source, as (line, text).
 pub fn suspects(source: &str) -> Vec<(usize, String)> {
-    let source = match source.find("#[cfg(test)]") {
-        Some(at) => &source[..at],
-        None => source,
-    };
-    literals(source)
+    let source = production_source(source);
+    literals(&source)
         .into_iter()
         .filter(|literal| is_prose(&literal.text) || SHOWN.contains(&literal.call.as_str()))
         .map(|literal| (literal.line, literal.text))
         .collect()
+}
+
+/// Keep lexical policy and original line numbers intact; remove only complete
+/// syntax nodes that definitely cannot exist with `test = false`. Unknown
+/// features remain visible, as do unparseable files (fail closed, never skip).
+pub(crate) fn production_source(source: &str) -> String {
+    let Ok(file) = syn::parse_file(source) else {
+        return source.to_owned();
+    };
+    #[derive(Default)]
+    struct Exclusions {
+        owner: Option<proc_macro2::Span>,
+        ranges: Vec<std::ops::Range<usize>>,
+    }
+    macro_rules! scope {
+        ($method:ident, $node:ty) => {
+            fn $method(&mut self, node: &'ast $node) {
+                let previous = self.owner.replace(node.span());
+                syn::visit::$method(self, node);
+                self.owner = previous;
+            }
+        };
+    }
+    impl<'ast> Visit<'ast> for Exclusions {
+        scope!(visit_item, syn::Item);
+        scope!(visit_impl_item, syn::ImplItem);
+        scope!(visit_trait_item, syn::TraitItem);
+        scope!(visit_foreign_item, syn::ForeignItem);
+        scope!(visit_field, syn::Field);
+        scope!(visit_field_value, syn::FieldValue);
+        scope!(visit_variant, syn::Variant);
+        scope!(visit_expr, syn::Expr);
+        scope!(visit_local, syn::Local);
+        scope!(visit_arm, syn::Arm);
+        scope!(visit_fn_arg, syn::FnArg);
+        scope!(visit_generic_param, syn::GenericParam);
+        scope!(visit_stmt_macro, syn::StmtMacro);
+
+        fn visit_attribute(&mut self, attr: &'ast syn::Attribute) {
+            if attr.path().is_ident("cfg")
+                && let Ok(condition) = attr.parse_args::<syn::Meta>()
+                && non_test_condition(&condition) == Some(false)
+                && let Some(owner) = self.owner
+            {
+                self.ranges.push(owner.byte_range());
+            }
+        }
+    }
+    let mut exclusions = Exclusions::default();
+    exclusions.visit_file(&file);
+    let mut bytes = source.as_bytes().to_vec();
+    for range in exclusions.ranges {
+        for byte in &mut bytes[range] {
+            if *byte != b'\n' && *byte != b'\r' {
+                *byte = b' ';
+            }
+        }
+    }
+    String::from_utf8(bytes).expect("whole syntax spans preserve UTF-8")
+}
+
+/// Evaluate only the test dimension. `any(test, feature = "x")` may be
+/// production code; `all(test, feature = "x")` cannot be.
+fn non_test_condition(meta: &syn::Meta) -> Option<bool> {
+    match meta {
+        syn::Meta::Path(path) if path.is_ident("test") => Some(false),
+        syn::Meta::List(list) => {
+            let terms = list
+                .parse_args_with(
+                    syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+                )
+                .ok()?;
+            if list.path.is_ident("not") && terms.len() == 1 {
+                non_test_condition(terms.first()?).map(|value| !value)
+            } else if list.path.is_ident("all") || list.path.is_ident("any") {
+                let all = list.path.is_ident("all");
+                let mut unknown = false;
+                for term in terms {
+                    match non_test_condition(&term) {
+                        Some(value) if value != all => return Some(value),
+                        None => unknown = true,
+                        _ => {}
+                    }
+                }
+                (!unknown).then_some(all)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 /// A sentence rather than an identifier: it has a letter, and either a space
@@ -474,6 +652,122 @@ mod tests {
         let source =
             "fn f() {}\n#[cfg(test)]\nmod tests {\n    const NAME: &str = \"Save changes\";\n}\n";
         assert!(suspects(source).is_empty());
+    }
+
+    #[test]
+    fn test_fields_and_nested_items_do_not_hide_later_production_strings() {
+        let source = concat!(
+            "// 中文 🦀 precedes every byte span\n",
+            "struct Count { #[cfg(test)] debug: [u8; { let _ = \"Test field\"; 0 }], value: usize }\n",
+            "impl Count { #[cfg(test)] fn helper() { say(\"Test method\"); }\n",
+            "fn render() { #[cfg(test)] { say(\"Test block\"); } say(\"Production method\"); } }\n",
+            "mod nested { #[cfg(test)] mod tests { fn f() { say(\"Nested test\"); } }\n",
+            "fn render() { say(\"Nested production\"); } }\n",
+            "fn after() { let _ = Count { #[cfg(test)] debug: { say(\"Test initializer\"); [] }, value: { say(\"Production initializer\"); 1 } }; }\n",
+            "fn last() { say(\"Last production\"); }\n",
+        );
+        assert_eq!(
+            suspects(source),
+            vec![
+                (4, "Production method".into()),
+                (6, "Nested production".into()),
+                (7, "Production initializer".into()),
+                (8, "Last production".into())
+            ]
+        );
+        assert_eq!(
+            production_source(source).lines().count(),
+            source.lines().count()
+        );
+    }
+
+    #[test]
+    fn cfg_syntax_preserves_possible_production_branches_and_literal_markers() {
+        let source = r##"
+            const MARKER: &str = "#[cfg(test)]";
+            #[cfg(any(test, feature = "live"))] fn possible() { say("Possible production"); }
+            #[cfg(all(test, feature = "live"))] fn only_test() { say("Only tests"); }
+            #[cfg(not(test))] fn production() { say("Production only"); }
+            #[cfg(not(not(test)))] fn tests() { say("Nested negation test"); }
+            #[cfg( test )] fn spaced() { say("Spaced test"); }
+            // #[cfg(test)] must not affect the next item.
+            fn after() { say("After comment"); }
+        "##;
+        assert_eq!(
+            suspects(source),
+            vec![
+                (3, "Possible production".into()),
+                (5, "Production only".into()),
+                (9, "After comment".into())
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_rust_never_silently_excludes_a_production_literal() {
+        assert_eq!(
+            suspects("#[cfg(test)] broken syntax; say(\"Still scanned\");"),
+            vec![(1, "Still scanned".into())]
+        );
+    }
+
+    #[test]
+    fn external_test_modules_follow_declarations_not_names() {
+        let modules = external_modules(
+            Path::new("src/chart.rs"),
+            r#"
+            #[cfg(test)] mod fixtures;
+            mod tests;
+            #[cfg(any(test, feature = "live"))] mod possible;
+            #[cfg(test)] mod nested { mod cases; }
+            #[cfg(test)] #[path = "shared.rs"] mod private;
+            #[path = "shared.rs"] mod public;
+        "#,
+        );
+        assert!(modules.contains(&(PathBuf::from("src/chart/fixtures.rs"), true)));
+        assert!(modules.contains(&(PathBuf::from("src/chart/tests.rs"), false)));
+        assert!(modules.contains(&(PathBuf::from("src/chart/possible.rs"), false)));
+        assert!(modules.contains(&(PathBuf::from("src/chart/nested/cases.rs"), true)));
+        assert!(modules.contains(&(PathBuf::from("src/shared.rs"), true)));
+        assert!(modules.contains(&(PathBuf::from("src/shared.rs"), false)));
+    }
+
+    #[test]
+    fn production_alias_vetoes_external_test_exclusion() -> Result<()> {
+        let directory =
+            std::env::temp_dir().join(format!("kit-string-scan-{}", std::process::id()));
+        fs::create_dir_all(directory.join("nested"))?;
+        fs::write(
+            directory.join("lib.rs"),
+            r#"
+            #[cfg(test)] mod fixtures;
+            mod tests;
+            #[cfg(test)] #[path = "shared.rs"] mod test_alias;
+            #[path = "nested/../shared.rs"] mod live_alias;
+        "#,
+        )?;
+        fs::write(
+            directory.join("fixtures.rs"),
+            "fn f() { say(\"Fixture only\"); }",
+        )?;
+        fs::write(
+            directory.join("tests.rs"),
+            "fn f() { say(\"Production despite name\"); }",
+        )?;
+        fs::write(
+            directory.join("shared.rs"),
+            "fn f() { say(\"Shared production\"); }",
+        )?;
+        let found = scan(&directory)?;
+        fs::remove_dir_all(directory)?;
+        assert_eq!(
+            found
+                .iter()
+                .map(|item| item.text.as_str())
+                .collect::<Vec<_>>(),
+            ["Shared production", "Production despite name"]
+        );
+        Ok(())
     }
 
     #[test]

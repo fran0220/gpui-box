@@ -28,14 +28,14 @@ implementation milestones rather than relabeling each partial stage as complete.
 
 | Stream | Required outcome | Owned boundary | Status |
 | --- | --- | --- | --- |
-| E1 Cartesian motion | Keyed enter/update/exit, visual style transitions, hide/show/reorder continuity, configurable timing, idle/active fast paths | Cartesian renderer, motion/layout/performance modules, legacy chart integration | Implementing |
-| E2 Cartesian exploration | Rich floating exact-value tooltip, emphasis, editable persistent range, overview navigation, linked caller state, reference/label layout | Same core owner as E1; one coherent implementation | Implementing |
-| E3 Specialized experience | Direct geometric picking, controlled hierarchy drilldown/back, layout/color lifecycle, useful labels/leader lines, improved conserved Sankey order | specialized, plot, heatmap and their scenes/tests | Implementing |
-| E4 Graph/trace | Animated node/routes, improved cycle/crossing/obstacle routing, bounded mounting, temporal range/navigation and incremental hierarchy | canvas graph/layout, trace and their scenes/tests | Implementing |
-| E5 Geography | Captured drag/touch exploration, hover/fit, camera/style motion, GeoJSON interchange, explicit antimeridian policy, spatial culling/index/simplification | geography and its scenes/tests | Implementing |
-| E6 Data/time foundation | Explicit calendar/timezone ticks and pure source-traceable filtering/aggregation/bin/window transforms | chart scale/data companion modules; coordinator | Implementing |
-| E7 Dynamic/performance acceptance | Real playback evidence, reduced motion and refused updates; sparse/dense and sustained updates; Linux/native platform evidence | shared performance tooling and integrated review; coordinator | Pending integration |
-| E8 Downstream delivery | Migration/composition guides, locale coverage, generated catalogs, full gate, main commits and hosted MCP verification | shared exports/strings/docs/release; coordinator | Pending integration |
+| E1 Cartesian motion | Keyed enter/update/exit, visual style transitions, hide/show/reorder continuity, configurable timing, idle/active fast paths | Cartesian renderer, motion/layout/performance modules, legacy chart integration | Integrated; tested playback |
+| E2 Cartesian exploration | Rich floating exact-value tooltip, emphasis, editable persistent range, overview navigation, linked caller state, reference/label layout | Same core owner as E1; one coherent implementation | Integrated; tested playback |
+| E3 Specialized experience | Direct geometric picking, controlled hierarchy drilldown/back, layout/color lifecycle, useful labels/leader lines, improved conserved Sankey order | specialized, plot, heatmap and their scenes/tests | Integrated; tested playback |
+| E4 Graph/trace | Animated node/routes, improved cycle/crossing/obstacle routing, bounded mounting, temporal range/navigation and incremental hierarchy | canvas graph/layout, trace and their scenes/tests | Integrated; safety snaps and work limits documented |
+| E5 Geography | Captured drag/touch exploration, hover/fit, camera/style motion, GeoJSON interchange, explicit antimeridian policy, spatial culling/index/simplification | geography and its scenes/tests | Integrated; tested playback |
+| E6 Data/time foundation | Explicit calendar/timezone ticks and pure source-traceable filtering/aggregation/bin/window transforms | chart scale/data companion modules; coordinator | Deployed foundation; batch transforms |
+| E7 Dynamic/performance acceptance | Real playback evidence, reduced motion and refused updates; sparse/dense and sustained updates; Linux/native platform evidence | shared performance tooling and integrated review; coordinator | Linux evidence integrated; native verification pending; no FPS guarantee |
+| E8 Downstream delivery | Migration/composition guides, locale coverage, generated catalogs, full gate, main commits and hosted MCP verification | shared exports/strings/docs/release; coordinator | Integrated; final gate and deployment pending |
 
 Workers continue their existing isolated threads, updated to the exact base.
 They own disjoint source families and return frozen incremental patches; messages
@@ -191,3 +191,55 @@ clean commit and verify both hosted catalogs and complete remote MCP schemas.
   Evidence: `/tmp/bounds-runtime-integration-gate-clean.log`. Two earlier attempts
   failed for disk exhaustion, not assertions; the successful attempt rebuilt a
   clean disposable debug target with incremental compilation disabled.
+
+### Combined experience integration (full Linux gate passed)
+
+- The coordinator has applied Cartesian lifecycle, controlled range/overview and
+  emphasis; specialized layout/motion; Geography G6 measured-leaf integration;
+  Trace hierarchy/range/localization; GraphSource, displayed node layout,
+  card/route paint retirement, node entrance and global obstacle routing.
+  Shared paint-recording follow-up and measured descriptive leaves use the
+  existing framework authority. Generated catalogs are rebuilt centrally.
+- Settings rows and custom section blocks now use horizontal `Space::Md` and
+  vertical `Space::Sm`, with aligned divider insets. The screenshot report
+  exposed the old 4px default. Twenty-five focused tests pass; all four Linux
+  settings/settings-page images were rendered, inspected and checked.
+- Graph source geometry reuse and incremental bounds-index refits, obstacle-safe
+  route transitions and interrupted timing changes are integrated. Route samples
+  share paint, hit, label and semantic geometry; incompatible corridors snap
+  rather than crossing obstacles. The material allocation ratchet is 11868 of
+  12105. Full metadata comparisons and arbitrary obstacle edits still scan or
+  reroute globally; these CPU budgets do not establish native FPS guarantees.
+- Trace expansion now moves surviving rows before publishing incoming rows.
+  Waiting rows have no semantic or input authority. Eleven runtime tests pass;
+  both themes have 125 actual 16ms playback frames checked for nonoverlapping
+  published rows, and the recorded clips were inspected. Selection, scrolling,
+  disabled and reduced motion snap without reviving old targets.
+- Syntax-aware string and API scanners retain production items following
+  test-only fields, including Unicode source spans and declared external test
+  modules. Graph state descriptions are localized while wire values remain
+  stable. Whole-tree accounting covers 479 literals, with no component exemption.
+- Combined gate 7 passed workspace default/all-feature tests, Clippy, catalogs,
+  performance, rustdoc and 408 Linux images, then exposed browser-release atlas
+  lease callback bounds. The framework now requires Send + Sync on native
+  release callbacks and preserves Wasm thread confinement without unsafe Send
+  wrappers. Both atlas tests and the exact browser release build pass. Final
+  gate 8 exited zero with `gate passed`: 1131 Kit unit tests, 1048 integration
+  tests and 90 xtask tests passed, along with workspace tests/Clippy, current
+  catalogs, performance, rustdoc, Wasm release, 408 matching Linux images and
+  13 Chromium mobile-input tests. The log is
+  `/tmp/visualization-combined-gate-8.log`. Browser touch emulation is not native
+  mobile device certification.
+- JS/runtime checks pass 209 tests with 17 platform skips. Catalog coverage
+  remains an explicit 200 of 212 native adapters, not a claim that unsupported
+  visualization bindings exist. Large active Cartesian revisions still scan
+  and copy source geometry. Native acceptance remains separate from Linux and
+  browser evidence.
+- Foundation native run
+  [34762664207](https://github.com/fran0220/gpui-box/actions/runs/34762664207)
+  passed native and runtime tests but failed image checks: Metal reports 14
+  changed/28 new frames; WARP reports 20 changed/28 new. Artifact inspection
+  found coherent old-baseline differences shared with foundation Linux, plus
+  six WARP frames with only 1–3 pixels exceeding tolerance by one channel step.
+  This is not native acceptance of the uncommitted integration, and baselines
+  have not been blindly accepted.

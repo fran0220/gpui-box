@@ -2,52 +2,338 @@
 
 use super::support::*;
 
-/// Unequal dimensions and disconnected components in a caller-applied layout.
+struct SceneLayoutSource {
+    source: GraphSource,
+    bounds: Vec<(SharedString, gpui::Bounds<f32>)>,
+    retargeted: bool,
+    removed: bool,
+    inspections: usize,
+    glass: bool,
+    viewport: GraphViewport,
+}
+impl Global for SceneLayoutSource {}
+
+fn layout_payload(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if cx.global::<SceneLayoutSource>().glass {
+        return Glass::new("scene.layout.optical")
+            .child(div().w(px(160.)).h(px(48.)).child("Optical payload"))
+            .into_any_element();
+    }
+    Button::new("scene.layout.inspect")
+        .label("Inspect payload")
+        .on_click(|_, cx| {
+            cx.update_global::<SceneLayoutSource, ()>(|scene, _| scene.inspections += 1);
+        })
+        .into_any_element()
+}
+
+/// Unequal dimensions, an SCC and disconnected components in a caller-applied layout.
 pub(super) fn node_graph_layout(_window: &mut Window, cx: &mut App) -> AnyElement {
     use crate::canvas::{GraphCyclePolicy, layered_layout_sized};
     let theme = cx.theme().clone();
-    let nodes = [
-        ("source-a", 180., 100.),
-        ("source-b", 220., 150.),
-        ("join", 260., 120.),
-        ("detached", 170., 90.),
-    ];
-    let edges = [
-        GraphEdge::new("source-a", "join"),
-        GraphEdge::new("source-b", "join"),
-    ];
-    let bounds = layered_layout_sized(
-        nodes.map(|(id, w, h)| (id.into(), gpui::size(w, h))),
-        &edges,
-        100.,
-        35.,
-        60.,
-        GraphCyclePolicy::Reject,
-    )
-    .expect("valid asymmetric DAG fixture");
-    let mut graph = NodeGraph::new("scene.layout.graph")
-        .edges(edges)
-        .offset(32., 24.)
-        .axes(false);
-    for (id, bounds) in bounds {
-        graph = graph.placed(
-            Placed::new(
-                GraphNode::new(id.clone(), id)
-                    .width(bounds.size.width)
-                    .state(NodeState::Succeeded),
-                bounds.origin.x,
-                bounds.origin.y,
-            )
-            .height(bounds.size.height),
-        );
+    if !cx.has_global::<SceneLayoutSource>() {
+        let nodes = [
+            ("source-a", 180., 100.),
+            ("source-b", 220., 150.),
+            ("join", 260., 120.),
+            ("detached", 170., 90.),
+            ("upstream", 160., 110.),
+        ];
+        let edges = [
+            GraphEdge::new("upstream", "source-a"),
+            GraphEdge::new("source-a", "source-b"),
+            GraphEdge::new("source-b", "source-a"),
+            GraphEdge::new("source-a", "join"),
+            GraphEdge::new("source-b", "join"),
+        ];
+        let bounds = layered_layout_sized(
+            nodes.map(|(id, w, h)| (id.into(), gpui::size(w, h))),
+            &edges,
+            45.,
+            35.,
+            60.,
+            GraphCyclePolicy::Condense,
+        )
+        .expect("valid asymmetric SCC fixture");
+        let source = GraphSource::new(
+            bounds.iter().cloned().map(|(id, bounds)| {
+                Placed::new(
+                    GraphNode::new(id.clone(), id)
+                        .width(bounds.size.width)
+                        .state(NodeState::Succeeded),
+                    bounds.origin.x,
+                    bounds.origin.y,
+                )
+                .height(bounds.size.height)
+            }),
+            edges,
+        )
+        .expect("canonical explicit-size source");
+        source
+            .set_content("source-b", layout_payload)
+            .expect("source payload");
+        cx.set_global(SceneLayoutSource {
+            source,
+            bounds,
+            retargeted: false,
+            removed: false,
+            inspections: 0,
+            glass: false,
+            viewport: GraphViewport::new(point(32., 24.), 1.),
+        });
     }
+    let source = cx.global::<SceneLayoutSource>().source.clone();
+    let removed = cx.global::<SceneLayoutSource>().removed;
+    let inspections = cx.global::<SceneLayoutSource>().inspections;
+    let glass = cx.global::<SceneLayoutSource>().glass;
+    let graph = NodeGraph::new("scene.layout.graph")
+        .source(source)
+        .viewport(cx.global::<SceneLayoutSource>().viewport)
+        .axes(false)
+        .on_event(|event, _, cx| {
+            if let NodeGraphEvent::ViewportChanged(viewport) = event {
+                cx.update_global::<SceneLayoutSource, ()>(|scene, _| scene.viewport = *viewport);
+            }
+        });
     stack(&theme)
         .w(px(860.))
         .child(caption(
             &theme,
-            "Fixture dimension-aware layers · separate component bands · stable identity order",
+            "Fixture SCC layers · external edges forward · dimension-aware component bands",
         ))
+        .child(
+            div()
+                .flex()
+                .gap(px(8.))
+                .child(
+                    Button::new("scene.layout.retarget")
+                        .label("Retarget join")
+                        .on_click(|_, cx| {
+                            cx.update_global::<SceneLayoutSource, ()>(|scene, _| {
+                                scene.retargeted = !scene.retargeted;
+                                let bounds = scene
+                                    .bounds
+                                    .iter()
+                                    .find(|(id, _)| id.as_ref() == "join")
+                                    .expect("join fixture bounds")
+                                    .1;
+                                let (x, y, width, height, state) = if scene.retargeted {
+                                    (
+                                        bounds.origin.x - 30.,
+                                        bounds.origin.y + 100.,
+                                        225.,
+                                        167.,
+                                        NodeState::Failed,
+                                    )
+                                } else {
+                                    (
+                                        bounds.origin.x,
+                                        bounds.origin.y,
+                                        bounds.size.width,
+                                        bounds.size.height,
+                                        NodeState::Succeeded,
+                                    )
+                                };
+                                scene
+                                    .source
+                                    .upsert(
+                                        Placed::new(
+                                            GraphNode::new("join", "join")
+                                                .width(width)
+                                                .state(state),
+                                            x,
+                                            y,
+                                        )
+                                        .height(height),
+                                    )
+                                    .expect("valid source retarget");
+                            });
+                        }),
+                )
+                .child(
+                    Button::new("scene.layout.remove")
+                        .label(if removed {
+                            "Reinsert source-b"
+                        } else {
+                            "Remove source-b"
+                        })
+                        .on_click(|_, cx| {
+                            cx.update_global::<SceneLayoutSource, ()>(|scene, _| {
+                                scene.removed = !scene.removed;
+                                if scene.removed {
+                                    scene.source.remove("source-b");
+                                } else {
+                                    let bounds = scene
+                                        .bounds
+                                        .iter()
+                                        .find(|(id, _)| id.as_ref() == "source-b")
+                                        .expect("source-b fixture bounds")
+                                        .1;
+                                    scene
+                                        .source
+                                        .upsert(
+                                            Placed::new(
+                                                GraphNode::new("source-b", "source-b")
+                                                    .width(bounds.size.width)
+                                                    .state(NodeState::Succeeded),
+                                                bounds.origin.x,
+                                                bounds.origin.y,
+                                            )
+                                            .height(bounds.size.height),
+                                        )
+                                        .expect("valid source reinsertion");
+                                    scene
+                                        .source
+                                        .set_content("source-b", layout_payload)
+                                        .expect("new payload incarnation");
+                                }
+                            });
+                        }),
+                )
+                .child(
+                    Button::new("scene.layout.glass")
+                        .label(if glass {
+                            "Use button payload"
+                        } else {
+                            "Use optical payload"
+                        })
+                        .disabled(removed)
+                        .on_click(|_, cx| {
+                            cx.update_global::<SceneLayoutSource, ()>(|scene, _| {
+                                scene.glass = !scene.glass;
+                                scene
+                                    .source
+                                    .set_content("source-b", layout_payload)
+                                    .expect("publish payload revision");
+                            });
+                        }),
+                ),
+        )
+        .child(
+            caption(&theme, format!("Payload inspections: {inspections}")).semantic_in(
+                cx,
+                NodeSpec::new("scene.layout.inspections", Role::Group)
+                    .value(inspections.to_string()),
+            ),
+        )
         .child(div().w_full().h(px(510.)).child(graph))
+        .into_any_element()
+}
+
+struct SceneRouting {
+    source: GraphSource,
+    buried: bool,
+    limited: bool,
+    connected: bool,
+}
+impl Global for SceneRouting {}
+
+fn routing_source(limited: bool) -> GraphSource {
+    let target_x = if limited { 200_300. } else { 600. };
+    let mut nodes = vec![
+        Placed::new(
+            GraphNode::new("routing.from", "Source")
+                .width(120.)
+                .state(NodeState::Succeeded),
+            0.,
+            140.,
+        )
+        .height(80.),
+        Placed::new(
+            GraphNode::new("routing.to", "Destination")
+                .width(120.)
+                .state(NodeState::Succeeded),
+            target_x,
+            140.,
+        )
+        .height(80.),
+    ];
+    if limited {
+        nodes.extend((0..1_000).map(|i| {
+            Placed::new(
+                GraphNode::new(format!("routing.wall.{i}"), format!("Wall {i}")).width(120.),
+                240. + i as f32 * 200.,
+                90. - i as f32 * 50.,
+            )
+            .height(180. + i as f32 * 100.)
+        }));
+    } else {
+        nodes.push(
+            Placed::new(
+                GraphNode::new("routing.wall", "Obstacle").width(100.),
+                280.,
+                80.,
+            )
+            .height(220.),
+        );
+    }
+    GraphSource::new(
+        nodes,
+        [GraphEdge::new("routing.from", "routing.to")
+            .id("routing.connection")
+            .state(EdgeState::Succeeded)
+            .label("Caller-owned connection")],
+    )
+    .expect("routing fixture geometry")
+}
+
+/// Global detours, animated obstacle movement and truthful routing fallbacks.
+pub(super) fn node_graph_routing(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    if !cx.has_global::<SceneRouting>() {
+        cx.set_global(SceneRouting {
+            source: routing_source(false),
+            buried: false,
+            limited: false,
+            connected: true,
+        });
+    }
+    let state = cx.global::<SceneRouting>();
+    let source = state.source.clone();
+    let buried = state.buried;
+    let limited = state.limited;
+    let connected = state.connected;
+    stack(&theme).w(px(860.))
+        .child(caption(&theme, if limited {
+            "Fixture · 1,000 increasingly tall walls · bounded search with a warned connection fallback"
+        } else {
+            "Fixture · all-node obstacles · current caller edge state is independent of routing status"
+        }))
+        .child(div().flex().gap(px(theme.spacing.xs))
+            .child(Button::new("scene.routing.move")
+                .label(if buried { "Restore obstacle" } else { "Cover source port" })
+                .disabled(limited)
+                .on_click(|_, cx| {
+                    cx.update_global::<SceneRouting, ()>(|scene, _| {
+                        scene.buried = !scene.buried;
+                        let (x, y, height) = if scene.buried { (105., 155., 80.) } else { (280., 80., 220.) };
+                        scene.source.upsert(Placed::new(GraphNode::new("routing.wall", "Obstacle").width(100.), x, y).height(height))
+                            .expect("caller-accepted obstacle move");
+                    });
+                }))
+            .child(Button::new("scene.routing.budget")
+                .label(if limited { "Simple fixture" } else { "Adversarial fixture" })
+                .on_click(|_, cx| {
+                    cx.update_global::<SceneRouting, ()>(|scene, _| {
+                        scene.limited = !scene.limited;
+                        scene.buried = false;
+                        scene.connected = true;
+                        scene.source = routing_source(scene.limited);
+                    });
+                }))
+            .child(Button::new("scene.routing.connection")
+                .label(if connected { "Remove connection" } else { "Restore connection" })
+                .on_click(|_, cx| {
+                    cx.update_global::<SceneRouting, ()>(|scene, _| {
+                        scene.connected = !scene.connected;
+                        scene.source.replace_edges(scene.connected.then(|| GraphEdge::new("routing.from", "routing.to")
+                            .id("routing.connection").state(EdgeState::Succeeded).label("Caller-owned connection")))
+                            .expect("caller-accepted connection change");
+                    });
+                })))
+        .child(div().w_full().h(px(440.)).child(NodeGraph::new("scene.routing.graph")
+            .source(source).axes(false).minimap(false)
+            .animate_layout(!limited).viewport(GraphViewport::new(point(32., 24.), 1.))))
         .into_any_element()
 }
 
@@ -511,6 +797,7 @@ pub(super) struct SceneGraphMotion {
     state: usize,
     viewport: GraphViewport,
     fit: u64,
+    lane: i16,
 }
 
 impl Global for SceneGraphMotion {}
@@ -523,6 +810,7 @@ pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElemen
             state: 4,
             viewport: GraphViewport::new(gpui::point(20.0, 12.0), 1.0),
             fit: 0,
+            lane: 1,
         });
     }
     let theme = cx.theme().clone();
@@ -530,6 +818,7 @@ pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElemen
     let state_index = motion_scene.state;
     let viewport = motion_scene.viewport;
     let fit = motion_scene.fit;
+    let lane = motion_scene.lane;
     let (state, state_label, _) = NODE_STATES[state_index];
     let state_cards = NODE_STATES.into_iter().map(|(state, label, slug)| {
         div().w(px(164.0)).child(
@@ -577,7 +866,15 @@ pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElemen
                             });
                             cx.refresh_windows();
                         }),
-                ),
+                )
+                .child(Button::new("scene.graph-motion.lane")
+                    .label("Shift successful route")
+                    .on_click(|_, cx| {
+                        cx.update_global::<SceneGraphMotion, ()>(|scene, _| {
+                            scene.lane = if scene.lane == 1 { 5 } else { 1 };
+                        });
+                        cx.refresh_windows();
+                    })),
         )
         .child(
             div()
@@ -677,7 +974,7 @@ pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElemen
                         .id("scene.graph-motion.edge.succeeded")
                         .ports("succeeded", "in")
                         .label("succeeded · selected")
-                        .lane(1)
+                        .lane(lane)
                         .state(EdgeState::Succeeded)
                         .selected(true),
                         GraphEdge::new("scene.graph-motion.source", "scene.graph-motion.failed")

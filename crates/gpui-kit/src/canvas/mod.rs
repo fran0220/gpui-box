@@ -37,11 +37,17 @@
 
 mod band;
 mod edge;
+mod geometry_motion;
 mod graph;
 mod group;
 mod layout;
 mod minimap;
 mod node;
+mod retirement;
+mod route_motion;
+mod router;
+mod source;
+mod spatial;
 mod toolbar;
 
 pub use band::GraphBand;
@@ -56,6 +62,7 @@ pub use minimap::{Minimap, MinimapEvent, MinimapMark, MinimapView};
 pub use node::{
     Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection, PortType,
 };
+pub use source::{GraphSource, GraphSourceError};
 pub use toolbar::{CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent};
 
 /// How much of a port's pointer target the drawn socket fills.

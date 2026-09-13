@@ -4,6 +4,13 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+Frozen paint recordings, per-allocation atlas leases, capture revision/reset
+fences, and callback-free replay are original GPUI Box framework work. They
+extend this tree's Scene, clipping, and native atlas implementations without
+new source imports, dependency authority changes, or historical receipt edits.
+The dynamic offscreen demonstrator uses existing bundled fonts and a synthetic
+two-color image. Native Metal and Direct3D acceptance remains pending.
+
 Calendar tick generation and source-traceable chart transforms are original
 GPUI Box work. Calendar resolution uses the existing Chrono public TimeZone API;
 the caller supplies production timezone policy. chrono-tz is a test-only
@@ -1119,3 +1126,28 @@ test directory are independently authored GPUI Box changes to the imported
 framework index. No third-party R-tree implementation was copied. The original
 file's upstream attribution and frozen historical import receipt remain intact;
 no package authority, renderer ABI or dependency source changed.
+
+### Measured descriptive semantic leaves
+
+`crates/gpui-kit-semantics/src/measured.rs` and its mounted tests are original
+GPUI Box work. They reuse the installed semantic coordinator and GPUI's existing
+synthetic AccessKit children, identity hashing, visual transform and conservative
+clip authority; no external implementation or additional registry was imported.
+The accessibility debug JSON bounds field exposes already committed geometry
+for verification without changing native publication. Package authority,
+upstream attribution and frozen historical import receipts remain unchanged.
+
+### Virtual-root layout placement
+
+Window placement metadata, UniformList publication of its actual row slots,
+and FLIP content-space sampling are original GPUI Box work. They distinguish
+layout movement from ambient scroll/ancestor slides without a second renderer,
+input transform or imported implementation. Frozen import receipts and package
+authority remain unchanged.
+
+### Atlas lease thread confinement
+
+Target-specific release bounds preserve native cross-thread GPU completion
+while keeping Wasm GPU resources thread-confined. The bound and native final-drop
+test are original GPUI Box work; no unsafe Send wrapper, external source or new
+dependency is introduced. Frozen import receipts remain unchanged.

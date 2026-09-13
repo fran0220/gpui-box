@@ -1663,6 +1663,19 @@ pub trait PlatformAtlas {
     ) -> Result<Option<AtlasTile>>;
     fn remove(&self, key: &AtlasKey);
 
+    /// Changes before unleased coordinates can be recycled by eviction/reset.
+    /// Atlases supporting retention must implement this capture-interval fence.
+    fn resource_revision(&self) -> u64 {
+        0
+    }
+
+    /// Retains every requested allocation until the last lease is dropped.
+    /// Unsupported atlases refuse capture. Implementations must invalidate all
+    /// leases before clearing/resetting resources or reusing tile identities.
+    fn retain_tiles(self: Arc<Self>, _tiles: &[AtlasTile]) -> Option<crate::AtlasLease> {
+        None
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     fn contains(&self, _key: &AtlasKey) -> bool {
         false

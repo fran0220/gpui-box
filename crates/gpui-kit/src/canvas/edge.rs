@@ -399,7 +399,7 @@ pub(crate) struct OrthogonalRoute {
 }
 
 impl OrthogonalRoute {
-    fn new(points: Vec<Point<f32>>) -> Self {
+    pub(super) fn new(points: Vec<Point<f32>>) -> Self {
         let points = normalize(points);
         let mut cumulative = vec![0.0];
         for pair in points.windows(2) {
@@ -432,6 +432,46 @@ impl OrthogonalRoute {
     }
     pub(crate) fn points(&self) -> &[Point<f32>] {
         &self.points
+    }
+    /// Conservative viewport intersection of the actual polyline, including
+    /// curves represented by their sampled segments. Endpoints may both lie
+    /// outside the viewport. Inclusive boundaries retain tangent strokes.
+    pub(crate) fn intersects(&self, bounds: Bounds<f32>, pad: f32) -> bool {
+        self.clipped_segments(bounds, pad).next().is_some()
+    }
+
+    /// Visible runs retain their original direction; disconnected runs are
+    /// never joined across an offscreen portion of the route.
+    pub(crate) fn clipped_segments(
+        &self,
+        bounds: Bounds<f32>,
+        pad: f32,
+    ) -> impl Iterator<Item = [Point<f32>; 2]> + '_ {
+        self.points.windows(2).filter_map(move |pair| {
+            let a = pair[0];
+            let b = pair[1];
+            let mut low = 0f32;
+            let mut high = 1f32;
+            for (origin, delta, min, max) in [
+                (a.x, b.x - a.x, bounds.left() - pad, bounds.right() + pad),
+                (a.y, b.y - a.y, bounds.top() - pad, bounds.bottom() + pad),
+            ] {
+                if delta == 0. {
+                    if origin < min || origin > max {
+                        return None;
+                    }
+                } else {
+                    let first = (min - origin) / delta;
+                    let last = (max - origin) / delta;
+                    low = low.max(first.min(last));
+                    high = high.min(first.max(last));
+                    if low > high {
+                        return None;
+                    }
+                }
+            }
+            Some([a + (b - a) * low, a + (b - a) * high])
+        })
     }
     fn terminal_tangent(&self) -> Point<f32> {
         let Some(pair) = self.points.windows(2).next_back() else {
@@ -556,7 +596,7 @@ impl RouteMetrics {
     /// units of length. A wire is read by following it, and each turn is a
     /// place to lose it; a route that is a little longer and turns less is
     /// the easier one to follow.
-    const BEND_PENALTY: f32 = 24.0;
+    pub(super) const BEND_PENALTY: f32 = 24.0;
 
     pub(crate) fn of(theme: &Theme) -> Self {
         Self {
@@ -748,7 +788,7 @@ fn facing_gap(from: Anchor, to: Anchor) -> Option<f32> {
     (gap > 0.0).then_some(gap)
 }
 
-fn lead_distance(anchor: Anchor, obstacle: Bounds<f32>, preferred: f32) -> Option<f32> {
+pub(super) fn lead_distance(anchor: Anchor, obstacle: Bounds<f32>, preferred: f32) -> Option<f32> {
     const EPSILON: f32 = 0.001;
     let point = anchor.point;
     if point.x > obstacle.left() + EPSILON
@@ -784,7 +824,7 @@ fn lead_distance(anchor: Anchor, obstacle: Bounds<f32>, preferred: f32) -> Optio
     }
 }
 
-fn route_is_directional(route: &OrthogonalRoute, from: Anchor, to: Anchor) -> bool {
+pub(super) fn route_is_directional(route: &OrthogonalRoute, from: Anchor, to: Anchor) -> bool {
     let Some(first) = route.points().get(1) else {
         return false;
     };
@@ -793,7 +833,9 @@ fn route_is_directional(route: &OrthogonalRoute, from: Anchor, to: Anchor) -> bo
     };
     let from_normal = from.side.outward();
     let to_normal = to.side.outward();
-    (first.x - from.point.x) * from_normal.x + (first.y - from.point.y) * from_normal.y > 0.0
+    (first.x - from.point.x) * from_normal.y == (first.y - from.point.y) * from_normal.x
+        && (before.x - to.point.x) * to_normal.y == (before.y - to.point.y) * to_normal.x
+        && (first.x - from.point.x) * from_normal.x + (first.y - from.point.y) * from_normal.y > 0.0
         && (before.x - to.point.x) * to_normal.x + (before.y - to.point.y) * to_normal.y > 0.0
 }
 
@@ -927,7 +969,7 @@ fn self_route(
     route
 }
 
-fn segment_clear(from: Point<f32>, to: Point<f32>, bounds: Bounds<f32>) -> bool {
+pub(super) fn segment_clear(from: Point<f32>, to: Point<f32>, bounds: Bounds<f32>) -> bool {
     const EPSILON: f32 = 0.001;
     if from.x == to.x {
         let low = from.y.min(to.y);
@@ -1438,6 +1480,49 @@ fn paint_trimmed_stroke(
 mod tests {
     use super::*;
     use gpui::size;
+
+    #[test]
+    fn clipping_preserves_separated_visible_runs_and_direction() {
+        let route = OrthogonalRoute::new(vec![
+            point(-10., 5.),
+            point(20., 5.),
+            point(20., 15.),
+            point(-10., 15.),
+        ]);
+        let runs: Vec<_> = route
+            .clipped_segments(Bounds::new(point(0., 0.), size(10., 20.)), 0.)
+            .collect();
+        assert_eq!(runs.len(), 2);
+        for (actual, expected) in runs.into_iter().flatten().zip([
+            point(0., 5.),
+            point(10., 5.),
+            point(10., 15.),
+            point(0., 15.),
+        ]) {
+            assert!((actual.x - expected.x).abs() < 0.0001);
+            assert!((actual.y - expected.y).abs() < 0.0001);
+        }
+    }
+
+    #[test]
+    fn viewport_intersection_uses_segments_not_endpoints_or_enclosing_box() {
+        let viewport = Bounds::new(point(10., 20.), size(30., 50.));
+        let crosses = OrthogonalRoute::new(vec![point(-100., 37.), point(200., 37.)]);
+        assert!(crosses.intersects(viewport, 0.));
+        let tangent = OrthogonalRoute::new(vec![point(-100., 20.), point(200., 20.)]);
+        assert!(tangent.intersects(viewport, 0.));
+        let near = OrthogonalRoute::new(vec![point(-100., 19.), point(200., 19.)]);
+        assert!(!near.intersects(viewport, 0.));
+        assert!(near.intersects(viewport, 1.));
+        let enclosing = OrthogonalRoute::new(vec![point(0., 0.), point(80., 0.), point(80., 90.)]);
+        assert!(!enclosing.intersects(viewport, 0.));
+        let diagonal_miss = OrthogonalRoute::new(vec![point(0., 65.), point(20., 85.)]);
+        assert!(!diagonal_miss.intersects(viewport, 0.));
+        let diagonal_hit = OrthogonalRoute::new(vec![point(0., 50.), point(50., 0.)]);
+        assert!(diagonal_hit.intersects(viewport, 0.));
+        let reversed = OrthogonalRoute::new(vec![point(50., 0.), point(0., 50.)]);
+        assert!(reversed.intersects(viewport, 0.));
+    }
 
     fn bounds(x: f32, y: f32) -> Bounds<f32> {
         Bounds::new(point(x, y), size(40.0, 30.0))

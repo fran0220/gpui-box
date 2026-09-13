@@ -741,7 +741,8 @@ impl Element for Flipped {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let origin = bounds.origin - window.element_offset();
+        // A virtual root's slot is layout; scrolling and ancestor slides are not.
+        let origin = bounds.origin - window.ambient_element_offset();
         let now = cx.background_executor().now();
         let offset = {
             let mut state = self.state.borrow_mut();

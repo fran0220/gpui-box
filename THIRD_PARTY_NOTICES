@@ -5,6 +5,11 @@ GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
 source and assets retain the licenses and attribution below. GPUI Box is an
 independent derivative and is not an official Zed Industries project.
 
+Frozen paint recording and atlas lifetime/replay infrastructure are original
+GPUI Box work. No additional third-party code or assets are imported; the
+demonstrator reuses the bundled fonts under their existing notices and creates
+its image fixture procedurally. Historical import receipts remain unchanged.
+
 Calendar chart ticks and source-traceable transforms are original Kit code.
 They use Chrono's public API (MIT OR Apache-2.0); chrono-tz 0.10.4 (MIT OR
 Apache-2.0) is used only by tests for named-timezone/DST fixtures. Production
@@ -627,3 +632,16 @@ Balanced framework BoundsTree overflow splitting, index-owned traversal and
 focused ordering/structure/performance tests are original GPUI Box work. No
 external spatial-index source or new dependency was imported. Existing GPUI
 attribution and frozen historical import receipts are unchanged.
+
+Measured descriptive semantic-leaf batching, mounted contract tests and native
+debug-bounds inspection are original GPUI Box additions using the existing
+semantic and GPUI accessibility authority. No third-party source, dependency,
+license or frozen historical import revision changes.
+
+Virtual-root placement metadata, UniformList layout-motion integration and
+Trace hierarchy reflow are original GPUI Box work with no new third-party
+source, dependency or changes to frozen import receipts.
+
+Native/Wasm atlas-lease release bounds and cross-thread final-drop tests are
+original GPUI Box work. No third-party source or dependency was added, and
+frozen import receipts are unchanged.

@@ -747,6 +747,44 @@ impl GraphNode {
         self.width
     }
 
+    pub(super) fn reusable(&self) -> bool {
+        self.thumbnail.is_none() && self.content.is_empty()
+    }
+
+    /// Only source-validated metadata can be cloned. Opaque elements stay on
+    /// the consumed legacy path or are supplied by a caller's lazy factory.
+    pub(super) fn clone_metadata(&self) -> Self {
+        debug_assert!(self.reusable());
+        Self {
+            ident: self.ident.clone(),
+            title: self.title.clone(),
+            icon: self.icon,
+            thumbnail: None,
+            thumbnail_ratio: self.thumbnail_ratio,
+            note: self.note.clone(),
+            note_lines: self.note_lines,
+            action: self.action.clone(),
+            state: self.state,
+            category: self.category.clone(),
+            kind: self.kind.clone(),
+            metrics: self.metrics.clone(),
+            ports: self.ports.clone(),
+            diff: self.diff,
+            status: self.status.clone(),
+            progress: self.progress,
+            content: Vec::new(),
+            selected: self.selected,
+            active_glass: self.active_glass,
+            width: self.width,
+            display_zoom: self.display_zoom,
+            declared_height: self.declared_height,
+            pointer_click: self.pointer_click,
+            compact: self.compact,
+            on_click: self.on_click.clone(),
+            on_delete: self.on_delete.clone(),
+        }
+    }
+
     pub(crate) fn node_state(&self) -> NodeState {
         self.state
     }
@@ -1038,11 +1076,14 @@ impl StateFade {
             self.started = change.animates().then_some(now);
             self.succeeded_at =
                 (state == NodeState::Succeeded && feedback.animates()).then_some(now);
-        } else if self.to != Some(target) {
+        } else if self.to != Some(target) || !change.animates() {
             // A theme change is not a node-state event.
             self.from = Some(target);
             self.to = Some(target);
             self.started = None;
+        }
+        if !feedback.animates() {
+            self.succeeded_at = None;
         }
         let visible = self.at(now, change.spec(), theme);
         let crossing = self.started.is_some_and(|started| {
@@ -1903,6 +1944,26 @@ mod tests {
             MotionPolicy::resolve_for(MotionRole::Feedback, theme, !animates),
             theme,
         )
+    }
+
+    #[test]
+    fn changing_motion_preference_settles_current_state_and_success_flash() {
+        for theme in [Theme::studio_light(), Theme::studio_dark()] {
+            let now = Instant::now();
+            let mut fade = StateFade::default();
+            show(&mut fade, NodeState::Failed, now, &theme, true);
+            let (_, crossing, flash) = show(&mut fade, NodeState::Succeeded, now, &theme, true);
+            assert!(crossing && flash > 0.);
+            let target = NodePaint::for_state(NodeState::Succeeded, &theme);
+            assert_eq!(
+                show(&mut fade, NodeState::Succeeded, now, &theme, false),
+                (target, false, 0.)
+            );
+            assert_eq!(
+                show(&mut fade, NodeState::Succeeded, now, &theme, true),
+                (target, false, 0.)
+            );
+        }
     }
 
     /// A state change was a hard cut: a node went from running to failed

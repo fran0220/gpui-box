@@ -1,17 +1,18 @@
-//! Local geographic visualization. No parsing, network, tiles, or provider assets.
+//! Local geographic visualization and bounded GeoJSON ingestion. No network,
+//! tiles or provider assets.
 //!
 //! Coordinates are longitude/latitude degrees. Supported projections are a
 //! spherical equirectangular and spherical Web Mercator, not geodetic distance
 //! or area calculations. Edges are straight **after projection**, not geodesics.
 //! Rings must be explicitly closed, simple, nondegenerate, and have no edge
-//! spanning more than 180° longitude. Split antimeridian features into separate
-//! polygons yourself (±180° endpoints are accepted). Holes must be strictly
+//! spanning more than 180° longitude in the prepared world. Use [`GeoWorldPolicy`]
+//! for an explicit or automatic longitude cut, or supply split polygons. Holes must be strictly
 //! inside the exterior, mutually disjoint and not nested or touching. Either
 //! winding is accepted. Exterior boundaries hit; hole boundaries do not.
 //!
 //! All math stays f64 until painting. Validation is quadratic in ring vertices;
 //! prepare a [`GeoData`] once and reuse it. Unsupported input is a refusal,
-//! never silently clipped, repaired, wrapped, or dropped. See docs/geography.md.
+//! never silently clipped, repaired or dropped. See docs/geography.md.
 //!
 //! ```
 //! use gpui_kit::display::{GeoColorDomain, GeoData, GeoMap, GeoPoint,
@@ -32,6 +33,13 @@
 
 pub mod view;
 pub use view::{GeoEvent, GeoMap, GeoState};
+mod exploration;
+mod ingest;
+mod painting;
+mod presentation;
+mod spatial;
+pub use ingest::{GeoProperties, GeoWorldPolicy};
+use spatial::{Envelope, SpatialIndex};
 
 use gpui::SharedString;
 use std::collections::HashSet;
@@ -71,6 +79,9 @@ pub enum GeoRefusal {
     DuplicateIdentity,
     InvalidValue,
     InvalidViewport,
+    InvalidGeoJson,
+    DocumentLimit,
+    InvalidSimplification,
     Unsupported(SharedString),
 }
 
@@ -85,6 +96,9 @@ impl GeoRefusal {
             Self::DuplicateIdentity => StringKey::GeographyDuplicateIdentity,
             Self::InvalidValue => StringKey::GeographyInvalidValue,
             Self::InvalidViewport => StringKey::GeographyInvalidViewport,
+            Self::InvalidGeoJson => StringKey::GeographyInvalidGeoJson,
+            Self::DocumentLimit => StringKey::GeographyDocumentLimit,
+            Self::InvalidSimplification => StringKey::GeographyInvalidSimplification,
             Self::Unsupported(_) => return None,
         })
     }
@@ -198,7 +212,7 @@ pub struct GeoColorDomain {
     pub missing_label: SharedString,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct ProjectedPolygon {
     exterior: Vec<GeoProjected>,
     holes: Vec<Vec<GeoProjected>>,
@@ -213,6 +227,9 @@ pub struct GeoData {
     polygons: Vec<Vec<ProjectedPolygon>>,
     projected_points: Vec<GeoProjected>,
     domain: GeoColorDomain,
+    central_longitude: f64,
+    spatial: SpatialIndex,
+    point_readings: std::collections::HashMap<SharedString, GeoProperties>,
 }
 
 impl GeoData {
@@ -285,6 +302,7 @@ impl GeoData {
             .iter()
             .map(|p| projection.project(p.position))
             .collect::<Result<Vec<_>, _>>()?;
+        let spatial = SpatialIndex::new(&polygons, &projected_points);
         Ok(Self {
             projection,
             features,
@@ -292,6 +310,9 @@ impl GeoData {
             polygons,
             projected_points,
             domain,
+            central_longitude: 0.0,
+            spatial,
+            point_readings: Default::default(),
         })
     }
 
@@ -308,6 +329,40 @@ impl GeoData {
         &self.domain
     }
 
+    /// Exact metadata supplied for a GeoJSON point. None means no reading was
+    /// supplied (as with native GeoPoint literals); Some with value None is an
+    /// explicitly unobserved reading. Point values need not fit the polygon
+    /// color domain, but must be finite.
+    pub fn point_reading(&self, id: &str) -> Option<&GeoProperties> {
+        self.point_readings.get(id)
+    }
+
+    fn readout(&self, index: usize) -> (&SharedString, &SharedString, SharedString) {
+        if let Some(f) = self.features.get(index) {
+            (
+                &f.id,
+                &f.label,
+                if f.value.is_some() {
+                    f.formatted_value.clone()
+                } else {
+                    self.domain.missing_label.clone()
+                },
+            )
+        } else {
+            let p = &self.points[index - self.features.len()];
+            let value =
+                self.point_reading(p.id.as_ref())
+                    .map_or_else(SharedString::default, |reading| {
+                        if reading.value.is_none() && reading.formatted_value.is_empty() {
+                            self.domain.missing_label.clone()
+                        } else {
+                            reading.formatted_value.clone()
+                        }
+                    });
+            (&p.id, &p.label, value)
+        }
+    }
+
     // Semantic visual envelopes, not hit regions. Include clipped real ring
     // edges and covered frame corners; a viewport entirely in a hole has no
     // feature envelope. Rendering still uses GPUI's own clipping primitive.
@@ -316,7 +371,13 @@ impl GeoData {
             return vec![];
         }
         let mut result = Vec::new();
-        for (index, polygons) in self.polygons.iter().enumerate() {
+        let candidates = self.visible_indices(viewport, size);
+        for index in candidates
+            .iter()
+            .copied()
+            .take_while(|i| *i < self.polygons.len())
+        {
+            let polygons = &self.polygons[index];
             let mut visible = Vec::new();
             for polygon in polygons {
                 for ring in std::iter::once(&polygon.exterior).chain(&polygon.holes) {
@@ -367,7 +428,13 @@ impl GeoData {
                 }
             }
         }
-        for (index, position) in self.projected_points.iter().enumerate() {
+        for index in candidates
+            .iter()
+            .copied()
+            .filter(|i| *i >= self.features.len())
+            .map(|i| i - self.features.len())
+        {
+            let position = &self.projected_points[index];
             let p = viewport.screen(*position, size);
             let dx = (p[0] - p[0].clamp(0.0, size[0])).abs();
             let dy = (p[1] - p[1].clamp(0.0, size[1])).abs();
@@ -397,6 +464,16 @@ impl GeoData {
         size: [f64; 2],
         position: [f64; 2],
     ) -> Option<SharedString> {
+        self.hit_test_visible(viewport, size, position, |_| true)
+    }
+
+    fn hit_test_visible(
+        &self,
+        viewport: GeoViewport,
+        size: [f64; 2],
+        position: [f64; 2],
+        visible: impl Fn(usize) -> bool,
+    ) -> Option<SharedString> {
         if viewport.validate().is_err()
             || size.iter().any(|v| !v.is_finite() || *v <= 0.0)
             || position
@@ -406,28 +483,34 @@ impl GeoData {
         {
             return None;
         }
-        for (p, source) in self.projected_points.iter().zip(&self.points).rev() {
-            let at = viewport.screen(*p, size);
-            if (at[0] - position[0]).hypot(at[1] - position[1]) <= 5.0 {
-                return Some(source.id.clone());
+        let world = viewport.world(position, size);
+        let radius = 5.0 / (size[0].min(size[1]) * viewport.zoom);
+        let candidates = self.spatial.query(Envelope([
+            world.x - radius,
+            world.y - radius,
+            world.x + radius,
+            world.y + radius,
+        ]));
+        for index in candidates.into_iter().rev() {
+            if !visible(index) {
+                continue;
+            }
+            if index >= self.features.len() {
+                let point_index = index - self.features.len();
+                let at = viewport.screen(self.projected_points[point_index], size);
+                if (at[0] - position[0]).hypot(at[1] - position[1]) <= 5.0 {
+                    return Some(self.points[point_index].id.clone());
+                }
+            } else if self.polygons[index].iter().any(|p| {
+                locate(&p.exterior, world) != Location::Outside
+                    && p.holes
+                        .iter()
+                        .all(|h| locate(h, world) == Location::Outside)
+            }) {
+                return Some(self.features[index].id.clone());
             }
         }
-        let world = viewport.world(position, size);
-        self.polygons
-            .iter()
-            .zip(&self.features)
-            .rev()
-            .find_map(|(polygons, feature)| {
-                polygons
-                    .iter()
-                    .any(|p| {
-                        locate(&p.exterior, world) != Location::Outside
-                            && p.holes
-                                .iter()
-                                .all(|h| locate(h, world) == Location::Outside)
-                    })
-                    .then(|| feature.id.clone())
-            })
+        None
     }
 }
 
@@ -610,6 +693,14 @@ fn project_ring(
     {
         return Err(GeoRefusal::AntimeridianEdge);
     }
+    validate_projected_ring(&points)?;
+    Ok(points)
+}
+
+fn validate_projected_ring(points: &[GeoProjected]) -> Result<(), GeoRefusal> {
+    if points.len() < 4 || points.first() != points.last() {
+        return Err(GeoRefusal::InvalidRing);
+    }
     let n = points.len() - 1;
     for i in 0..n {
         if (points[i].x - points[i + 1].x).hypot(points[i].y - points[i + 1].y) <= EPSILON {
@@ -638,8 +729,10 @@ fn project_ring(
     if area.abs() <= EPSILON {
         return Err(GeoRefusal::InvalidRing);
     }
-    Ok(points)
+    Ok(())
 }
 
+#[cfg(test)]
+mod experience_tests;
 #[cfg(test)]
 mod tests;

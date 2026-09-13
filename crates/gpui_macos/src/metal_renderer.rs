@@ -666,6 +666,10 @@ impl MetalRenderer {
         texture: &metal::TextureRef,
         viewport_size: Size<DevicePixels>,
     ) -> Result<metal::CommandBuffer> {
+        anyhow::ensure!(
+            scene.paint_resources_valid(),
+            "frozen paint resources were reset"
+        );
         let mut writer = InstanceBufferWriter::new(
             &self.device,
             &self.instance_buffer_pool,

@@ -1200,6 +1200,7 @@ pub struct Window {
     pub(crate) text_style_stack: Vec<TextStyleRefinement>,
     pub(crate) rendered_entity_stack: Vec<EntityId>,
     pub(crate) element_offset_stack: Vec<Point<Pixels>>,
+    element_placement_stack: Vec<Point<Pixels>>,
     pub(crate) element_opacity: f32,
     pub(crate) edge_fade: Option<EdgeFade>,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
@@ -2125,6 +2126,7 @@ impl Window {
             text_style_stack: Vec::new(),
             rendered_entity_stack: Vec::new(),
             element_offset_stack: Vec::new(),
+            element_placement_stack: Vec::new(),
             content_mask_stack: Vec::new(),
             clip_chain: crate::ClipChain::default(),
             visual_transform: crate::VisualTransform::default(),
@@ -4247,6 +4249,144 @@ impl Window {
         );
     }
 
+    /// Marks the start of live GPUI painting, without retaining any element.
+    /// Pair with [`Self::record_paint_since`] in this same paint call.
+    pub fn paint_mark(&self) -> crate::PaintMark {
+        self.invalidator.debug_assert_paint();
+        crate::PaintMark {
+            epoch: self.next_frame.scene.paint_epoch.clone(),
+            start: self.next_frame.scene.len(),
+            window: self.handle.window_id(),
+            scale: self.scale_factor(),
+            platform_views: self.next_frame.platform_views.len(),
+            resource_revision: self.sprite_atlas.resource_revision(),
+            transform: self.visual_transform,
+            opacity: self.element_opacity,
+            layers: self.next_frame.scene.recording_layers(),
+        }
+    }
+
+    /// Freezes paint emitted since `mark`. This never runs element callbacks.
+    /// Capture refuses unsupported content as a whole; callers should retire
+    /// it immediately. Deferred draws anywhere in the frame conservatively
+    /// refuse capture because their eventual paint is outside this range.
+    pub fn record_paint_since(
+        &mut self,
+        mark: crate::PaintMark,
+    ) -> Result<crate::PaintRecording, crate::PaintRecordingError> {
+        use crate::PaintRecordingError as Error;
+        self.invalidator.debug_assert_paint();
+        if mark.window != self.handle.window_id() {
+            return Err(Error::WindowMismatch);
+        }
+        if mark.scale != self.scale_factor() {
+            return Err(Error::ScaleMismatch);
+        }
+        if mark.resource_revision != self.sprite_atlas.resource_revision() {
+            return Err(Error::ResourceReset);
+        }
+        if !Arc::ptr_eq(&mark.epoch, &self.next_frame.scene.paint_epoch) {
+            return Err(Error::StaleMark);
+        }
+        if mark.platform_views != self.next_frame.platform_views.len() {
+            return Err(Error::PlatformView);
+        }
+        if !self.next_frame.deferred_draws.is_empty() {
+            return Err(Error::DeferredDraw);
+        }
+        if !mark.opacity.is_finite() || mark.opacity <= 0. {
+            return Err(Error::InvisibleCapture);
+        }
+        let scene = self.next_frame.scene.freeze_paint(
+            mark.start..self.next_frame.scene.len(),
+            &mark.layers,
+            self.sprite_atlas.clone(),
+        )?;
+        Ok(crate::PaintRecording {
+            scene: Rc::new(scene),
+            window: mark.window,
+            scale: mark.scale,
+            transform: mark.transform,
+            opacity: mark.opacity,
+        })
+    }
+
+    /// Replays frozen visual paint only, replacing capture-time ambient uniform
+    /// transform/opacity with the current scope. The captured visible clipping
+    /// moves with the picture and intersects current clipping; previously culled
+    /// content never reappears. No live element authority returns.
+    pub fn paint_recording(
+        &mut self,
+        recording: &crate::PaintRecording,
+    ) -> Result<(), crate::PaintRecordingError> {
+        self.paint_recording_with_offset(recording, Point::default())
+    }
+
+    /// Replays as [`Self::paint_recording`], translated by `offset` in current
+    /// local replay coordinates. The ambient visual scale applies to this offset
+    /// exactly once. Current ancestor clipping does not move with the offset.
+    pub fn paint_recording_with_offset(
+        &mut self,
+        recording: &crate::PaintRecording,
+        offset: Point<Pixels>,
+    ) -> Result<(), crate::PaintRecordingError> {
+        use crate::PaintRecordingError as Error;
+        self.invalidator.debug_assert_paint();
+        if !offset.x.0.is_finite() || !offset.y.0.is_finite() {
+            return Err(Error::InvalidOffset);
+        }
+        if recording.window != self.handle.window_id() {
+            return Err(Error::WindowMismatch);
+        }
+        if recording.scale != self.scale_factor() {
+            return Err(Error::ScaleMismatch);
+        }
+        if self.edge_fade.is_some() {
+            return Err(Error::EdgeFade);
+        }
+        let mask = ContentMask {
+            bounds: self
+                .visual_transform
+                .map_bounds(self.content_mask().bounds)
+                .scale(self.scale_factor()),
+        };
+        let delta = if self.visual_transform == recording.transform {
+            crate::TransformationMatrix::unit()
+                .translate(offset.scale(self.scale_factor() * self.visual_transform.scale()))
+        } else {
+            let inverse_scale = 1. / recording.transform.scale();
+            let inverse_offset = recording
+                .transform
+                .unmap_point(Point::default())
+                .scale(self.scale_factor());
+            self.visual_transform
+                .matrix(self.scale_factor())
+                .translate(offset.scale(self.scale_factor()))
+                .compose(crate::TransformationMatrix {
+                    rotation_scale: [[inverse_scale, 0.], [0., inverse_scale]],
+                    translation: [inverse_offset.x.0, inverse_offset.y.0],
+                })
+        };
+        let opacity = self.element_opacity / recording.opacity;
+        if !opacity.is_finite()
+            || !delta
+                .rotation_scale
+                .iter()
+                .flatten()
+                .chain(delta.translation.iter())
+                .all(|value| value.is_finite())
+        {
+            return Err(Error::InvalidReplayScope);
+        }
+        let previous = self.next_frame.scene.replace_visual_transform(delta);
+        let result = self
+            .next_frame
+            .scene
+            .replay_frozen(&recording.scene, mask, opacity);
+        self.next_frame.scene.replace_visual_transform(previous);
+        result
+    }
+
     pub(crate) fn paint_index(&self) -> PaintIndex {
         PaintIndex {
             scene_index: self.next_frame.scene.len(),
@@ -4634,6 +4774,35 @@ impl Window {
         result
     }
 
+    /// Places a root-laid-out subtree at `origin`, identifying `scroll_offset`
+    /// as ambient scrolling rather than layout placement. Virtualizers supply
+    /// their actual slot origin and scroll offset, not a second layout estimate.
+    ///
+    /// Rendering, clipping, input and accessibility use the same absolute
+    /// placement as `with_absolute_element_offset`. The additional metadata lets
+    /// layout motion distinguish a reordered slot from scrolling or ancestor
+    /// slides. Nested placement composes in the parent's content coordinates.
+    /// Call only during prepaint.
+    pub fn with_placed_element_offset<R>(
+        &mut self,
+        origin: Point<Pixels>,
+        scroll_offset: Point<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let placement = self
+            .element_placement_stack
+            .last()
+            .copied()
+            .unwrap_or_default()
+            + origin
+            - scroll_offset
+            - self.element_offset();
+        self.element_placement_stack.push(placement);
+        let result = self.with_absolute_element_offset(origin, f);
+        self.element_placement_stack.pop();
+        result
+    }
+
     pub(crate) fn with_element_opacity<R>(
         &mut self,
         opacity: Option<f32>,
@@ -4765,6 +4934,20 @@ impl Window {
             .last()
             .copied()
             .unwrap_or_default()
+    }
+
+    /// Offset due to scrolling and transient ancestor slides, excluding layout
+    /// placement declared by `with_placed_element_offset`. Subtract this from
+    /// an element's prepaint origin to sample its content-space layout position.
+    /// Without a declared placement scope this equals `element_offset()`.
+    /// This is prepaint metadata, not a separate rendering or hit-test transform.
+    pub fn ambient_element_offset(&self) -> Point<Pixels> {
+        self.element_offset()
+            - self
+                .element_placement_stack
+                .last()
+                .copied()
+                .unwrap_or_default()
     }
 
     /// Obtain the current element opacity. This method should only be called during the

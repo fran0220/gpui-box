@@ -15,6 +15,7 @@ serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 quote.workspace = true
+proc-macro2 = { workspace = true, features = ["span-locations"] }
 syn = { workspace = true, features = ["visit"] }
 toml.workspace = true
 # The site is the one thing here that does produce HTML. `gpui-kit` takes this

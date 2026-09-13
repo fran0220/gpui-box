@@ -432,7 +432,7 @@ fn geography_accepts_input_and_hole_clicks_clear_selection(cx: &mut gpui::TestAp
     let sensor = harness
         .bounds("accepted.geometry.sensor")
         .expect("measured sensor");
-    assert!((f32::from(sensor.left() - map_bounds.left()) - 341.66666).abs() <= 0.5);
+    assert!((f32::from(sensor.left() - map_bounds.left()) - 341.66666).abs() < 0.0001);
     assert_eq!(sensor.size, gpui::size(px(10.0), px(10.0)));
     harness.click("accepted.map"); // Center lies in the hole, not its polygon.
     assert!(state.borrow().1.is_none());
@@ -456,19 +456,19 @@ fn geography_accepts_input_and_hole_clicks_clear_selection(cx: &mut gpui::TestAp
     let geometry = harness
         .bounds("accepted.geometry.region")
         .expect("transformed polygon");
-    // GPUI snaps measured layout to device pixels, unlike the f64 camera.
+    // Batch envelopes retain projected fractions, without per-leaf layout snapping.
     for (actual, expected) in [
         (geometry.left() - map_bounds.left(), 184.5),
         (geometry.top() - map_bounds.top(), 96.25),
         (geometry.size.width, 175.0),
         (geometry.size.height, 87.5),
     ] {
-        assert!((f64::from(f32::from(actual)) - expected).abs() <= 0.5);
+        assert!((f64::from(f32::from(actual)) - expected).abs() < 0.0001);
     }
     let sensor = harness
         .bounds("accepted.geometry.sensor")
         .expect("transformed sensor");
-    assert!((f32::from(sensor.left() - map_bounds.left()) - 325.33334).abs() <= 0.5);
+    assert!((f32::from(sensor.left() - map_bounds.left()) - 325.33334).abs() < 0.0001);
     assert_eq!(sensor.size, gpui::size(px(10.0), px(10.0)));
     harness.keystrokes("home escape");
     assert_eq!(state.borrow().0, GeoViewport::default());

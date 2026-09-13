@@ -21,8 +21,32 @@ use std::rc::Rc;
 
 #[path = "cartesian_layout.rs"]
 mod layout;
+#[path = "cartesian_lifecycle.rs"]
+mod lifecycle;
 #[path = "cartesian_motion.rs"]
 mod motion;
+#[path = "cartesian_range.rs"]
+mod range;
+pub use range::CartesianRange;
+
+/// Visualization lifecycle timing resolved through the existing motion engine.
+/// Domain/orientation changes remain direct; reduced motion settles immediately.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CartesianMotion {
+    pub enter: crate::motion::MotionSpec,
+    pub update: crate::motion::MotionSpec,
+    pub exit: crate::motion::MotionSpec,
+}
+impl CartesianMotion {
+    pub fn themed(theme: &gpui_kit_theme::Theme) -> Self {
+        use crate::motion::{MotionPolicy, MotionRole};
+        Self {
+            enter: MotionPolicy::spec(MotionRole::Entrance, theme),
+            update: MotionPolicy::spec(MotionRole::Resize, theme),
+            exit: MotionPolicy::spec(MotionRole::Exit, theme),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ChartOrientation {
@@ -45,8 +69,10 @@ pub enum CartesianEvent {
     Hover(Option<ChartSelection>),
     Select(Option<ChartSelection>),
     Visibility { series: SharedString, visible: bool },
+    Emphasis(Option<SharedString>),
     Viewport(NumericScale),
     Brush([ChartValue; 2]),
+    Range(crate::interaction::range::RangeEvent),
     Reset,
 }
 
@@ -55,6 +81,22 @@ pub enum TooltipMode {
     #[default]
     Point,
     SharedAxis,
+}
+
+/// Current caller data for one rich tooltip row. Values are never interpolated.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChartTooltipRow {
+    pub series_id: SharedString,
+    pub series_label: SharedString,
+    pub point: RawPoint,
+    pub color: Hsla,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChartTooltipData {
+    pub anchor: ChartSelection,
+    pub x: ChartValue,
+    pub rows: Vec<ChartTooltipRow>,
 }
 
 /// Sampling changes paths, never source marks, identities or readouts.
@@ -125,6 +167,7 @@ pub struct ChartReference {
 
 type EventHandler = Rc<dyn Fn(CartesianEvent, &mut Window, &mut App)>;
 type Formatter = Rc<dyn Fn(&str, f64) -> SharedString>;
+type TooltipBuilder = Rc<dyn Fn(&ChartTooltipData, &mut Window, &mut App) -> gpui::AnyElement>;
 type MarkPainter = Rc<dyn Fn(Bounds<Pixels>, Hsla, &mut Window, &mut App)>;
 type MarkBuilder = Rc<dyn Fn(&RawSeries, &RawPoint) -> Option<CustomMark>>;
 
@@ -186,12 +229,17 @@ pub struct CartesianChart {
     hidden: Vec<SharedString>,
     hovered: Option<ChartSelection>,
     selected: Option<ChartSelection>,
+    emphasized: Option<SharedString>,
     tooltip: TooltipMode,
+    tooltip_content: Option<TooltipBuilder>,
+    floating_tooltip: bool,
+    range: Option<CartesianRange>,
     references: Vec<ChartReference>,
     stale: Option<SharedString>,
     status: ChartStatus,
     height: f32,
     animate: bool,
+    motion: Option<CartesianMotion>,
     sampling: PathSampling,
     format: Formatter,
     x_ticks: Option<Vec<(f64, SharedString)>>,
@@ -219,7 +267,11 @@ impl CartesianChart {
             hidden: Vec::new(),
             hovered: None,
             selected: None,
+            emphasized: None,
             tooltip: TooltipMode::Point,
+            tooltip_content: None,
+            floating_tooltip: true,
+            range: None,
             references: Vec::new(),
             stale: None,
             status: ChartStatus {
@@ -229,6 +281,7 @@ impl CartesianChart {
             },
             height: 220.,
             animate: true,
+            motion: None,
             sampling: PathSampling::Exact,
             format: Rc::new(|_, v| v.to_string().into()),
             x_ticks: None,
@@ -256,6 +309,12 @@ impl CartesianChart {
     /// immediately. Axis/topology changes snap to preserve direct manipulation.
     pub fn animate(mut self, enabled: bool) -> Self {
         self.animate = enabled;
+        self
+    }
+    /// Configure keyed arrival, geometry/color updates and paint-only departure.
+    /// This does not override `.animate(false)` or reduced-motion policy.
+    pub fn motion(mut self, motion: CartesianMotion) -> Self {
+        self.motion = Some(motion);
         self
     }
     /// Opt into pixel-column path reduction; the default preserves every
@@ -325,8 +384,34 @@ impl CartesianChart {
         self.selected = point;
         self
     }
+    /// Dim other series visually without removing hit or semantic targets.
+    /// Unknown/hidden identities produce no emphasis. Legend hover only proposes.
+    pub fn emphasized(mut self, series: Option<impl Into<SharedString>>) -> Self {
+        self.emphasized = series.map(Into::into);
+        self
+    }
     pub fn tooltip(mut self, mode: TooltipMode) -> Self {
         self.tooltip = mode;
+        self
+    }
+    /// Customize the read-only floating surface using current raw observations.
+    /// Window-bounded placement and a retained accessible readout remain owned
+    /// by the chart. Interactive controls belong outside this hover surface.
+    pub fn tooltip_content(
+        mut self,
+        build: impl Fn(&ChartTooltipData, &mut Window, &mut App) -> gpui::AnyElement + 'static,
+    ) -> Self {
+        self.tooltip_content = Some(Rc::new(build));
+        self
+    }
+    /// Hide only the floating surface; the persistent accessible readout stays.
+    pub fn floating_tooltip(mut self, visible: bool) -> Self {
+        self.floating_tooltip = visible;
+        self
+    }
+    /// Add a controlled persistent numeric selection and overview strip.
+    pub fn range(mut self, range: CartesianRange) -> Self {
+        self.range = Some(range);
         self
     }
     pub fn references(mut self, references: impl IntoIterator<Item = ChartReference>) -> Self {
@@ -410,6 +495,47 @@ impl Hit {
             series[self.series].id.clone(),
             series[self.series].points[self.point].id.clone(),
         )
+    }
+}
+
+#[derive(Default)]
+struct HitCache {
+    projection: Option<Rc<Vec<ProjectedSeries>>>,
+    dimensions: [f32; 2],
+    custom: bool,
+    hits: Rc<Vec<Hit>>,
+    index: Option<Rc<HitIndex>>,
+}
+
+impl HitCache {
+    fn get(
+        &mut self,
+        projection: &Rc<Vec<ProjectedSeries>>,
+        dimensions: [f32; 2],
+        custom: bool,
+        build: impl FnOnce() -> Vec<Hit>,
+    ) -> Rc<Vec<Hit>> {
+        let same = !custom
+            && !self.custom
+            && self.dimensions == dimensions
+            && self
+                .projection
+                .as_ref()
+                .is_some_and(|previous| Rc::ptr_eq(previous, projection));
+        if !same {
+            self.hits = Rc::new(build());
+            self.projection = Some(projection.clone());
+            self.dimensions = dimensions;
+            self.custom = custom;
+            self.index = None;
+        }
+        self.hits.clone()
+    }
+
+    fn index(&mut self) -> Rc<HitIndex> {
+        self.index
+            .get_or_insert_with(|| Rc::new(HitIndex::new(self.hits.iter().map(|hit| hit.rect))))
+            .clone()
     }
 }
 
@@ -559,9 +685,14 @@ impl RenderOnce for CartesianChart {
             window.window_handle().window_id(),
             cx,
         );
+        let revision = projected.clone();
+        let timing = self
+            .motion
+            .unwrap_or_else(|| CartesianMotion::themed(&theme));
+        geometry.borrow_mut().spec = Some(timing.update);
         if self.animate {
-            geometry.borrow_mut().animate(
-                Rc::make_mut(&mut projected).as_mut_slice(),
+            projected = geometry.borrow_mut().animate(
+                projected,
                 &self.series,
                 (self.x.clone(), self.axes.clone()),
                 window,
@@ -570,6 +701,29 @@ impl RenderOnce for CartesianChart {
         } else {
             *geometry.borrow_mut() = motion::GeometryMotion::default();
         }
+        let lifecycle = crate::motion::keyed::slot::<lifecycle::Lifecycle>(
+            &self.ident.child("lifecycle").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let paint_styles = if self.animate {
+            lifecycle.borrow_mut().animate(
+                self.series.clone(),
+                (revision, projected.clone()),
+                (self.x.clone(), self.axes.clone(), orientation),
+                timing,
+                window,
+                cx,
+            )
+        } else {
+            *lifecycle.borrow_mut() = lifecycle::Lifecycle::default();
+            Rc::new(lifecycle::PaintStyles::default())
+        };
+        geometry
+            .borrow_mut()
+            .prune(!paint_styles.retired.is_empty());
+        let range = range::build(&self, window, cx);
+        let emphasis = lifecycle::emphasis(&self, window, cx);
         let measured = measure::cell(&self.ident.child("plot-bounds").semantic_id(), window, cx);
         let width = f32::from(measured.get().size.width);
         let width = if width > 0. { width } else { 320. };
@@ -767,35 +921,47 @@ impl RenderOnce for CartesianChart {
                 }
             }
         }
+        let custom = Rc::new(custom);
+        lifecycle.borrow_mut().custom(custom.clone(), band);
         let custom_size = |series, point| {
             custom
                 .get(&(series, point))
                 .map(|mark| orientation.dimensions(mark.size[0], mark.size[1]))
         };
-        let hits = Rc::new(
-            projected
-                .iter()
-                .flat_map(|s| {
-                    s.points.iter().flatten().map(|p| {
-                        let series = &self.series[s.source];
-                        Hit {
-                            series: s.source,
-                            point: p.source,
-                            x: mark_center(p, s, series.mark, band),
-                            y: p.y,
-                            rect: mark_rect(
-                                p,
-                                s,
-                                series.mark,
-                                band,
-                                logical_width,
-                                logical_height,
-                                custom_size(s.source, p.source),
-                            ),
-                        }
+        let hit_cache = crate::motion::keyed::slot::<HitCache>(
+            &self.ident.child("hit-geometry").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let hits = hit_cache.borrow_mut().get(
+            &projected,
+            [logical_width, logical_height],
+            self.custom_marks.is_some(),
+            || {
+                projected
+                    .iter()
+                    .flat_map(|s| {
+                        s.points.iter().flatten().map(|p| {
+                            let series = &self.series[s.source];
+                            Hit {
+                                series: s.source,
+                                point: p.source,
+                                x: mark_center(p, s, series.mark, band),
+                                y: p.y,
+                                rect: mark_rect(
+                                    p,
+                                    s,
+                                    series.mark,
+                                    band,
+                                    logical_width,
+                                    logical_height,
+                                    custom_size(s.source, p.source),
+                                ),
+                            }
+                        })
                     })
-                })
-                .collect::<Vec<_>>(),
+                    .collect::<Vec<_>>()
+            },
         );
         let mut semantics = Vec::new();
         for s in projected.iter() {
@@ -870,26 +1036,143 @@ impl RenderOnce for CartesianChart {
         let refs = self.references.clone();
         let paint_theme = theme.clone();
         let current = self.hovered.as_ref().or(self.selected.as_ref());
-        let current_hit = current.and_then(|id| hits.iter().find(|p| p.matches(id, &self.series)));
+        let current_hit = current.and_then(|id| {
+            hits.iter().find(|p| {
+                p.matches(id, &self.series) && p.rect[0] <= p.rect[2] && p.rect[1] <= p.rect[3]
+            })
+        });
         let crosshair = current_hit.map(|p| p.x);
-        let readout = current_hit.map(|current| {
-            hits.iter()
-                .filter(|p| {
-                    if self.tooltip == TooltipMode::SharedAxis {
-                        self.series[p.series].points[p.point].x
-                            == self.series[current.series].points[current.point].x
+        let tooltip_data = current_hit.map(|current| {
+            let x = self.series[current.series].points[current.point].x.clone();
+            let mut rows = Vec::new();
+            for (index, series) in self.series.iter().enumerate() {
+                if self.hidden.contains(&series.id) {
+                    continue;
+                }
+                for (point_index, raw) in series.points.iter().enumerate() {
+                    if if self.tooltip == TooltipMode::SharedAxis {
+                        raw.x == x
                     } else {
-                        p.series == current.series && p.point == current.point
+                        index == current.series && point_index == current.point
+                    } {
+                        rows.push(ChartTooltipRow {
+                            series_id: series.id.clone(),
+                            series_label: series.label.clone(),
+                            point: raw.clone(),
+                            color: raw
+                                .color
+                                .or(series.color)
+                                .unwrap_or(theme.colors.sequence.get(index)),
+                        });
                     }
-                })
-                .map(|p| {
-                    let series = &self.series[p.series];
-                    let raw = &series.points[p.point];
-                    format!("{} · {}: {}", series.label, raw.label, raw.formatted)
+                }
+            }
+            ChartTooltipData {
+                anchor: current.selection(&self.series),
+                x,
+                rows,
+            }
+        });
+        let readout = tooltip_data.as_ref().map(|data| {
+            data.rows
+                .iter()
+                .map(|row| {
+                    format!(
+                        "{} · {}: {}",
+                        row.series_label, row.point.label, row.point.formatted
+                    )
                 })
                 .collect::<Vec<_>>()
                 .join("  |  ")
         });
+        let floating = if self.floating_tooltip {
+            tooltip_data.as_ref().zip(current_hit).map(|(data, hit)| {
+                let content = if let Some(build) = &self.tooltip_content {
+                    build(data, window, cx)
+                } else {
+                    div()
+                        .column()
+                        .gap_token(&theme, Space::Xs)
+                        .children(data.rows.iter().map(|row| {
+                            div()
+                                .row()
+                                .items_center()
+                                .gap_token(&theme, Space::Sm)
+                                .child(
+                                    div()
+                                        .size(px(8.))
+                                        .flex_shrink_0()
+                                        .bg(row.color)
+                                        .rounded_full(),
+                                )
+                                .child(
+                                    div()
+                                        .column()
+                                        .child(row.series_label.clone())
+                                        .child(row.point.label.clone()),
+                                )
+                                .child(div().ml_auto().child(row.point.formatted.clone()))
+                        }))
+                        .into_any_element()
+                };
+                let [x, y] = orientation.screen(hit.x, hit.y);
+                let above = y > 0.5;
+                let before = x > 0.5;
+                let anchor = match (above, before) {
+                    (false, false) => gpui::Anchor::TopLeft,
+                    (false, true) => gpui::Anchor::TopRight,
+                    (true, false) => gpui::Anchor::BottomLeft,
+                    (true, true) => gpui::Anchor::BottomRight,
+                };
+                let surface = crate::overlay::surface(
+                    self.ident.child("tooltip"),
+                    &theme,
+                    crate::overlay::OverlaySurface::FLOATING,
+                )
+                .p(px(theme.space(Space::Sm)))
+                .max_w(px((f32::from(window.viewport_size().width)
+                    - theme.space(Space::Sm) * 2.)
+                    .clamp(1., 360.)))
+                .max_h(px((f32::from(window.viewport_size().height)
+                    - theme.space(Space::Sm) * 2.)
+                    .max(1.)))
+                .overflow_hidden()
+                .type_scale(&theme, TypeScale::Caption)
+                .child(content)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("tooltip").semantic_id(), Role::Tooltip)
+                        .parent(self.ident.semantic_id())
+                        .text(self.label.clone())
+                        .value(readout.clone().unwrap_or_default()),
+                );
+                div()
+                    .absolute()
+                    .left(relative(x.clamp(0., 1.) as f32))
+                    .top(relative(y.clamp(0., 1.) as f32))
+                    .size_0()
+                    .child(
+                        gpui::deferred(
+                            gpui::anchored()
+                                .anchor(anchor)
+                                .snap_to_window_with_margin(px(theme.space(Space::Sm)))
+                                .child(
+                                    div()
+                                        .when(before, |el| el.pr(px(theme.space(Space::Sm))))
+                                        .when(!before, |el| el.pl(px(theme.space(Space::Sm))))
+                                        .when(above, |el| el.pb(px(theme.space(Space::Sm))))
+                                        .when(!above, |el| el.pt(px(theme.space(Space::Sm))))
+                                        .child(surface),
+                                ),
+                        )
+                        .unclipped()
+                        .priority(1),
+                    )
+                    .into_any_element()
+            })
+        } else {
+            None
+        };
         let canvas = canvas(
             |_, _, _| {},
             move |bounds, _, window, cx| {
@@ -928,11 +1211,22 @@ impl RenderOnce for CartesianChart {
                         );
                     }
                 }
-                for s in projected.iter() {
-                    let source = &painted_series[s.source];
-                    let color = source
+                for (s, data, custom, band) in paint_styles
+                    .retired
+                    .iter()
+                    .map(|layer| (&layer.projected, &layer.raw, &layer.custom, layer.band))
+                    .chain(
+                        projected
+                            .iter()
+                            .map(|s| (s, &painted_series, &custom, band)),
+                    )
+                {
+                    let source = &data[s.source];
+                    let base_color = source
                         .color
                         .unwrap_or(paint_theme.colors.sequence.get(s.source));
+                    let color = paint_styles.series(source, base_color);
+                    let opacity = emphasis.get(&source.id).copied().unwrap_or(1.);
                     for run in s.points.split(Option::is_none) {
                         let run = run.iter().flatten().collect::<Vec<_>>();
                         if run.is_empty() {
@@ -975,7 +1269,8 @@ impl RenderOnce for CartesianChart {
                                 if let Ok(path) = path.build() {
                                     window.paint_path(
                                         path,
-                                        color.opacity(paint_theme.effects.area_wash_alpha),
+                                        color
+                                            .opacity(paint_theme.effects.area_wash_alpha * opacity),
                                     );
                                 }
                             }
@@ -983,7 +1278,7 @@ impl RenderOnce for CartesianChart {
                             path.move_to(at(samples[0][0], samples[0][1]));
                             trace(&mut path, &samples, source.curve, &at);
                             if let Ok(path) = path.build() {
-                                window.paint_path(path, color);
+                                window.paint_path(path, color.opacity(opacity));
                             }
                         }
                         for p in run {
@@ -995,7 +1290,9 @@ impl RenderOnce for CartesianChart {
                             if rect[0] > rect[2] || rect[1] > rect[3] {
                                 continue;
                             }
-                            let color = source.points[p.source].color.unwrap_or(color);
+                            let color = paint_styles
+                                .point(source, &source.points[p.source], color)
+                                .opacity(opacity);
                             if matches!(source.mark, SeriesMark::Bar | SeriesMark::Range) {
                                 let a = p.x + s.bar_offset * band;
                                 let b = a + s.bar_width * band;
@@ -1088,9 +1385,10 @@ impl RenderOnce for CartesianChart {
             .overflow_hidden()
             .surface(&theme, Surface::Canvas)
             .child(canvas)
-            .children(semantics);
+            .children(semantics)
+            .children(floating);
         if let Some(report) = self.on_event.clone() {
-            let hit_index = Rc::new(HitIndex::new(hits.iter().map(|hit| hit.rect)));
+            let hit_index = hit_cache.borrow_mut().index();
             let gesture = crate::motion::keyed::slot::<Option<Gesture>>(
                 &self.ident.child("gesture").semantic_id(),
                 window.window_handle().window_id(),
@@ -1321,9 +1619,14 @@ impl RenderOnce for CartesianChart {
         let mut legend =
             ChartLegend::new(self.ident.child("legend"), legend_series).hidden(self.hidden);
         if let Some(report) = self.on_event {
-            legend = legend.on_toggle(move |series, visible, window, cx| {
-                report(CartesianEvent::Visibility { series, visible }, window, cx)
-            });
+            let hover = report.clone();
+            legend = legend
+                .on_emphasis(move |series, window, cx| {
+                    hover(CartesianEvent::Emphasis(series), window, cx)
+                })
+                .on_toggle(move |series, visible, window, cx| {
+                    report(CartesianEvent::Visibility { series, visible }, window, cx)
+                });
         }
         let has_data = !hits.is_empty();
         div()
@@ -1374,7 +1677,18 @@ impl RenderOnce for CartesianChart {
                     .children(bottom_axes)
             }))
             .children((!has_data).then(|| div().child(cx.strings().text(StringKey::ChartEmpty))))
-            .children(readout.map(|text| div().type_scale(&theme, TypeScale::Caption).child(text)))
+            .children(readout.map(|text| {
+                div()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .child(text.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.child("readout").semantic_id(), Role::Status)
+                            .parent(self.ident.semantic_id())
+                            .text(self.label.clone())
+                            .value(text),
+                    )
+            }))
             .children(self.references.iter().map(|reference| {
                 div()
                     .type_scale(&theme, TypeScale::Caption)
@@ -1393,6 +1707,7 @@ impl RenderOnce for CartesianChart {
                     )
             }))
             .child(legend)
+            .children(range)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)

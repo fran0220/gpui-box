@@ -1093,6 +1093,10 @@ impl DirectXRenderer {
     }
 
     fn upload_scene_buffers(&mut self, scene: &Scene, transparent_overlay: bool) -> Result<()> {
+        anyhow::ensure!(
+            scene.paint_resources_valid(),
+            "frozen paint resources were reset"
+        );
         let devices = self.devices.as_ref().context("devices missing")?;
 
         let nodes = scene.clip_nodes.nodes();

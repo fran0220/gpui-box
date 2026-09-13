@@ -278,7 +278,8 @@ impl SettingsRow {
             .w_full()
             .items_center()
             .gap_token(theme, Space::Md)
-            .p_token(theme, Space::Xs)
+            .px_token(theme, Space::Md)
+            .py_token(theme, Space::Sm)
             .child(names)
             .child(
                 div().flex_1().min_w_0().child(right).semantic_in(
@@ -514,7 +515,8 @@ impl RenderOnce for SettingsSection {
                 SectionContent::Block(block) if dimmed.is_none() => div()
                     .w_full()
                     .min_w_0()
-                    .p_token(&theme, Space::Xs)
+                    .px_token(&theme, Space::Md)
+                    .py_token(&theme, Space::Sm)
                     .child(block)
                     .into_any_element(),
                 SectionContent::Block(_) => continue,
@@ -523,7 +525,7 @@ impl RenderOnce for SettingsSection {
                 content.push(
                     div()
                         .w_full()
-                        .px_token(&theme, Space::Xs)
+                        .px_token(&theme, Space::Md)
                         .child(crate::foundation::inset_rule(&theme).w_full())
                         .into_any_element(),
                 );

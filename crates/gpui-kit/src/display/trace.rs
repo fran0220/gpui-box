@@ -5,7 +5,13 @@
 //! chart scale. The host owns the viewport, formatted labels, duration and
 //! hierarchy; the component proposes changes and mounts only its row window.
 
-use std::{collections::HashSet, rc::Rc};
+mod index;
+mod range;
+
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
@@ -13,6 +19,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use web_time::Instant;
 
 use crate::display::badge::Tone;
 use crate::display::chart::scale::{NumericScale, ScaleError, ScaleKind};
@@ -22,6 +29,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::layout::measure;
 use crate::motion;
+use crate::motion::Flipping;
 use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -30,6 +38,8 @@ type ViewportHandler = Rc<dyn Fn(NumericScale, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type TimeFormatter = Rc<dyn Fn(f64) -> SharedString>;
 type WheelHandler = Rc<dyn Fn(&gpui::ScrollWheelEvent, &mut Window, &mut App)>;
+type TimeSelectionHandler =
+    Rc<dyn Fn(crate::interaction::range::RangeEvent, &mut Window, &mut App)>;
 
 /// Shared temporal presentation, never an independent scale engine. Hierarchy
 /// uses caller-supplied preorder and depth; collapsed descendants are omitted.
@@ -41,6 +51,11 @@ struct TraceOptions {
     collapsed: HashSet<SharedString>,
     on_toggle: Option<ToggleHandler>,
     visible_rows: usize,
+    animate_viewport: bool,
+    animate_layout: bool,
+    layout_animation: Option<motion::MotionSpec>,
+    selected_time: Option<[f64; 2]>,
+    on_time_selection: Option<TimeSelectionHandler>,
 }
 
 impl Default for TraceOptions {
@@ -52,23 +67,127 @@ impl Default for TraceOptions {
             collapsed: HashSet::new(),
             on_toggle: None,
             visible_rows: 12,
+            animate_viewport: true,
+            animate_layout: true,
+            layout_animation: None,
+            selected_time: None,
+            on_time_selection: None,
         }
     }
 }
 
-fn visible_indices(spans: &[TraceSpan], collapsed: &HashSet<SharedString>) -> Vec<usize> {
-    let mut hidden_below = None;
-    spans
-        .iter()
-        .enumerate()
-        .filter_map(|(index, span)| {
-            if hidden_below.is_some_and(|depth| span.depth > depth) {
-                return None;
-            }
-            hidden_below = collapsed.contains(&span.id).then_some(span.depth);
-            Some(index)
-        })
-        .collect()
+struct ViewportMotion {
+    start: motion::Transition<f64>,
+    end: motion::Transition<f64>,
+}
+
+/// Publication, not geometry: survivors move through FLIP before new rows are
+/// mounted in the space they vacate. Remember only the mounted row window.
+#[derive(Default)]
+struct RowPublication {
+    mounted: HashMap<SharedString, usize>,
+    waiting: Option<(Instant, HashSet<SharedString>)>,
+    scroll: Option<gpui::Point<gpui::Pixels>>,
+    spec: Option<motion::MotionSpec>,
+    selected: Option<SharedString>,
+}
+
+impl RowPublication {
+    fn prepare(
+        &mut self,
+        hierarchy: &index::Hierarchy,
+        scroll: gpui::Point<gpui::Pixels>,
+        now: Instant,
+        animate: bool,
+        spec: motion::MotionSpec,
+    ) -> bool {
+        let scrolled = self.scroll.is_some_and(|previous| previous != scroll);
+        self.scroll = Some(scroll);
+        let moved = self
+            .mounted
+            .iter()
+            .any(|(id, previous)| hierarchy.position(id).is_some_and(|rank| rank != *previous));
+        if !animate || scrolled {
+            self.waiting = None;
+        } else if moved || (self.waiting.is_some() && self.spec != Some(spec)) {
+            self.waiting = Some((now + spec.total(), self.mounted.keys().cloned().collect()));
+        } else if self
+            .waiting
+            .as_ref()
+            .is_some_and(|(until, _)| now >= *until)
+        {
+            self.waiting = None;
+        }
+        self.spec = Some(spec);
+        self.mounted.clear();
+        !scrolled && animate
+    }
+
+    fn publish(&mut self, id: &SharedString, rank: usize) -> bool {
+        if self
+            .waiting
+            .as_ref()
+            .is_some_and(|(_, allowed)| !allowed.contains(id))
+        {
+            return false;
+        }
+        self.mounted.insert(id.clone(), rank);
+        true
+    }
+}
+
+impl ViewportMotion {
+    fn new(viewport: NumericScale, spec: motion::MotionSpec) -> Self {
+        let [start, end] = viewport.domain();
+        Self {
+            start: motion::Transition::new(start, spec),
+            end: motion::Transition::new(end, spec),
+        }
+    }
+
+    fn target(&mut self, viewport: NumericScale, spec: motion::MotionSpec, snap: bool) {
+        let [start, end] = viewport.domain();
+        // Reversing orientation would pass through a zero-width domain. Publish
+        // it directly rather than inventing a transient expanded time extent.
+        let reversed = (self.start.target() < self.end.target()) != (start < end);
+        self.start = self.start.spec(spec);
+        self.end = self.end.spec(spec);
+        if snap || reversed {
+            self.start.snap(start);
+            self.end.snap(end);
+        } else {
+            self.start.set(start);
+            self.end.set(end);
+        }
+    }
+
+    fn animate(
+        &mut self,
+        viewport: NumericScale,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> NumericScale {
+        self.start.animate(window, cx);
+        self.end.animate(window, cx);
+        self.sampled_viewport(viewport)
+    }
+
+    fn sampled_viewport(&mut self, viewport: NumericScale) -> NumericScale {
+        let start = self.start.value();
+        let end = self.end.value();
+        // Independent endpoints must never invert the requested orientation.
+        // Overshoot can cross them; adjacent values can also round together.
+        // Neither is a caller-requested reversed or expanded constant domain.
+        if start != end
+            && (start < end) == (viewport.domain()[0] < viewport.domain()[1])
+            && let Ok(shown) = NumericScale::new(ScaleKind::Time, [start, end])
+        {
+            return shown;
+        }
+        self.start.snap(viewport.domain()[0]);
+        self.end.snap(viewport.domain()[1]);
+        viewport
+    }
 }
 
 fn interval(span: &TraceSpan, viewport: NumericScale) -> Option<(f32, f32)> {
@@ -323,7 +442,53 @@ impl TraceView {
         Ok(self)
     }
 
-    /// Format measured-density raw-time ticks; no locale is guessed.
+    /// Animate caller-applied time windows. Reduced motion and orientation
+    /// reversal settle immediately; proposals always use the current caller window.
+    pub fn animate_viewport(mut self, animate: bool) -> Self {
+        self.options.animate_viewport = animate;
+        self
+    }
+
+    /// Animate surviving mounted rows after caller-applied hierarchy changes.
+    /// Enabled by default, independently of time viewport motion. Disabled or
+    /// reduced motion settles immediately; removed rows have no exit animation.
+    pub fn animate_layout(mut self, animate: bool) -> Self {
+        self.options.animate_layout = animate;
+        self
+    }
+
+    /// Override Tracking timing for row positions, not the time viewport.
+    /// Retargeting starts at displayed geometry. New rows wait for survivors
+    /// to settle, then mount in place without hidden handlers or semantics.
+    pub fn layout_animation(mut self, spec: motion::MotionSpec) -> Self {
+        self.options.layout_animation = Some(spec);
+        self
+    }
+
+    /// Persistent caller-owned ascending raw time range. None clears it.
+    /// A range outside the viewport remains authoritative but cannot be resized
+    /// until the caller brings it into view; it is never silently normalized.
+    pub fn selected_time(
+        mut self,
+        value: Option<[f64; 2]>,
+    ) -> Result<Self, crate::interaction::range::RangeError> {
+        range::validate(value)?;
+        self.options.selected_time = value;
+        Ok(self)
+    }
+
+    /// Shows a range strip and proposes Create/Resize/Move Update, Commit and
+    /// Cancel events. Cancellation never rolls back previously accepted values.
+    pub fn on_time_selection(
+        mut self,
+        handler: impl Fn(crate::interaction::range::RangeEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_time_selection = Some(Rc::new(handler));
+        self
+    }
+
+    /// Formats raw-time ticks and human-facing range/span readouts. The caller
+    /// owns locale, timezone and precision; event/selection values stay raw.
     pub fn format_time(mut self, format: impl Fn(f64) -> SharedString + 'static) -> Self {
         self.options.formatter = Some(Rc::new(format));
         self
@@ -478,7 +643,51 @@ impl SpanTimeline {
         Ok(self)
     }
 
-    /// Format measured-density raw-time ticks; no locale is guessed.
+    /// Animate caller-applied time windows. Reduced motion and orientation
+    /// reversal settle immediately; proposals always use the current caller window.
+    pub fn animate_viewport(mut self, animate: bool) -> Self {
+        self.options.animate_viewport = animate;
+        self
+    }
+
+    /// Animate surviving mounted rows after caller-applied hierarchy changes.
+    /// Enabled by default, independently of time viewport motion. Disabled or
+    /// reduced motion settles immediately; removed rows have no exit animation.
+    pub fn animate_layout(mut self, animate: bool) -> Self {
+        self.options.animate_layout = animate;
+        self
+    }
+
+    /// Override Tracking timing for row positions, not the time viewport.
+    /// Retargeting starts at displayed geometry. New rows wait for survivors
+    /// to settle, then mount in place without hidden handlers or semantics.
+    pub fn layout_animation(mut self, spec: motion::MotionSpec) -> Self {
+        self.options.layout_animation = Some(spec);
+        self
+    }
+
+    /// Persistent caller-owned ascending raw time range. None clears it.
+    /// Out-of-viewport values remain authoritative rather than being normalized.
+    pub fn selected_time(
+        mut self,
+        value: Option<[f64; 2]>,
+    ) -> Result<Self, crate::interaction::range::RangeError> {
+        range::validate(value)?;
+        self.options.selected_time = value;
+        Ok(self)
+    }
+
+    /// Shows a range strip and proposes shared controlled range events.
+    pub fn on_time_selection(
+        mut self,
+        handler: impl Fn(crate::interaction::range::RangeEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_time_selection = Some(Rc::new(handler));
+        self
+    }
+
+    /// Formats raw-time ticks and human-facing range/span readouts. The caller
+    /// owns locale, timezone and precision; event/selection values stay raw.
     pub fn format_time(mut self, format: impl Fn(f64) -> SharedString + 'static) -> Self {
         self.options.formatter = Some(Rc::new(format));
         self
@@ -593,13 +802,46 @@ fn waterfall(
     on_select: Option<SelectHandler>,
     slots: &Slots,
     with_label: bool,
-    options: TraceOptions,
+    mut options: TraceOptions,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::AnyElement {
     let theme = cx.theme().clone();
     let empty = spans.is_empty();
-    let with_duration = spans.iter().any(|span| span.duration.is_some());
+    let requested_viewport = options.viewport;
+    let held_viewport = range::prepare(
+        &ident.child("time-selection"),
+        requested_viewport,
+        options.selected_time,
+        options.on_time_selection.clone(),
+        window,
+        cx,
+    );
+    let animation_target = held_viewport.unwrap_or(requested_viewport);
+    let viewport_motion = motion::keyed::slot::<Option<ViewportMotion>>(
+        &ident.child("time-motion").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let policy = motion::MotionPolicy::resolve(motion::MotionRole::Navigation, cx);
+    {
+        let mut state = viewport_motion.borrow_mut();
+        let transition =
+            state.get_or_insert_with(|| ViewportMotion::new(requested_viewport, policy.spec()));
+        transition.target(
+            animation_target,
+            policy.spec(),
+            held_viewport.is_some() || !options.animate_viewport || !policy.animates(),
+        );
+        options.viewport = transition.animate(animation_target, window, cx);
+    }
+    let indices = crate::motion::keyed::slot::<index::Hierarchy>(
+        &ident.child("hierarchy").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    indices.borrow_mut().update(&spans, &options.collapsed);
+    let with_duration = indices.borrow().with_duration;
     let measured = measure::cell(&ident.child("measure").semantic_id(), window, cx);
     let left_gutter = AXIS_GUTTER
         + if with_label {
@@ -615,11 +857,30 @@ fn waterfall(
         };
     let width = (f32::from(measured.get().size.width) - left_gutter - right_gutter).max(0.);
     let ticks = viewport_ticks(ticks, &options, width);
-    let indices = Rc::new(visible_indices(&spans, &options.collapsed));
     let scroll = crate::data::viewport::scroll_handle(&ident.child("rows"), window, cx);
+    let publication = motion::keyed::slot::<RowPublication>(
+        &ident.child("row-publication").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let policy = motion::MotionPolicy::resolve(motion::MotionRole::Tracking, cx);
+    // Direct navigation must reveal the current caller-selected row without
+    // waiting for a decorative rearrangement, just like scrolling does.
+    let selection_changed = publication.borrow().selected.as_ref() != current;
+    publication.borrow_mut().selected = current.cloned();
+    options.animate_layout = publication.borrow_mut().prepare(
+        &indices.borrow(),
+        scroll.0.borrow().base_handle.offset(),
+        cx.background_executor().now(),
+        options.animate_layout && policy.animates() && !selection_changed,
+        options.layout_animation.unwrap_or(policy.spec()),
+    );
+    if publication.borrow().waiting.is_some() {
+        window.request_animation_frame();
+    }
     let wheel: Option<WheelHandler> = options.on_viewport.clone().map(|handler| {
         let measured = measured.clone();
-        let viewport = options.viewport;
+        let viewport = requested_viewport;
         Rc::new(
             move |event: &gpui::ScrollWheelEvent, window: &mut Window, cx: &mut App| {
                 if !event.modifiers.control && !event.modifiers.shift {
@@ -656,7 +917,7 @@ fn waterfall(
             .into_any_element()
         })
     } else {
-        let count = indices.len();
+        let count = indices.borrow().len();
         let row_height = ROW_HEIGHT + theme.space(Space::Xs);
         let render_row = {
             let ident = ident.clone();
@@ -667,9 +928,15 @@ fn waterfall(
             let spans = spans.clone();
             let on_select = on_select.clone();
             let wheel = wheel.clone();
-            move |index: usize, cx: &App| {
-                let source_index = indices[index];
+            move |index: usize, window: &mut Window, cx: &mut App| {
+                let source_index = indices
+                    .borrow()
+                    .get(index)
+                    .unwrap_or_else(|| unreachable!());
                 let span = &spans[source_index];
+                if !publication.borrow_mut().publish(&span.id, index) {
+                    return div().w_full().h(px(row_height)).into_any_element();
+                }
                 let branch = spans
                     .get(source_index + 1)
                     .is_some_and(|next| next.depth > span.depth);
@@ -691,14 +958,34 @@ fn waterfall(
                     let wheel = wheel.clone();
                     row = row.on_scroll_wheel(move |event, window, cx| wheel(event, window, cx));
                 }
-                row
+                // Only mounted business identities retain geometry. FLIP excludes
+                // ambient scroll offsets and moves semantics and hit targets with
+                // paint; the hierarchy remains the sole visible-rank authority.
+                let flip = motion::flip(
+                    ident
+                        .child("row-motion")
+                        .child(span.id.clone())
+                        .semantic_id(),
+                    window,
+                    cx,
+                );
+                let row = row.flip(&flip, window, cx).animate(options.animate_layout);
+                match options.layout_animation {
+                    Some(spec) => row.animation(spec),
+                    None => row,
+                }
+                .into_any_element()
             }
         };
         let rows = if count > options.visible_rows {
             uniform_list(
                 ident.child("rows").element_id(),
                 count,
-                move |range, _, cx| range.map(|index| render_row(index, cx)).collect::<Vec<_>>(),
+                move |range, window, cx| {
+                    range
+                        .map(|index| render_row(index, window, cx))
+                        .collect::<Vec<_>>()
+                },
             )
             .track_scroll(&scroll)
             .w_full()
@@ -708,7 +995,7 @@ fn waterfall(
             div()
                 .column()
                 .w_full()
-                .children((0..count).map(|index| render_row(index, cx)))
+                .children((0..count).map(|index| render_row(index, window, cx)))
                 .into_any_element()
         };
         div()
@@ -733,7 +1020,7 @@ fn waterfall(
         .on_children_prepainted({
             let measured = measured.clone();
             move |bounds, window, _| {
-                if let Some(body) = bounds.last() {
+                if let Some(body) = bounds.get(1) {
                     measure::record(&measured, *body, window);
                 }
             }
@@ -769,39 +1056,45 @@ fn waterfall(
             .on_key_down(move |event, window, cx| {
                 let at = selected
                     .as_ref()
-                    .and_then(|id| indices.iter().position(|i| &spans[*i].id == id));
+                    .and_then(|id| indices.borrow().position(id));
                 let next = match event.keystroke.key.as_str() {
-                    "down" => {
-                        Some(at.map_or(0, |at| (at + 1).min(indices.len().saturating_sub(1))))
-                    }
+                    "down" => Some(at.map_or(0, |at| {
+                        (at + 1).min(indices.borrow().len().saturating_sub(1))
+                    })),
                     "up" => Some(at.unwrap_or(0).saturating_sub(1)),
                     "home" => Some(0),
-                    "end" => Some(indices.len().saturating_sub(1)),
+                    "end" => Some(indices.borrow().len().saturating_sub(1)),
                     "left" | "right" => {
                         if let Some(at) = at {
-                            let index = indices[at];
+                            let index = indices.borrow().get(at).unwrap_or_else(|| unreachable!());
                             let span = &spans[index];
-                            if spans
+                            let branch = spans
                                 .get(index + 1)
-                                .is_some_and(|next| next.depth > span.depth)
-                                && let Some(toggle) = &toggle
-                            {
-                                let expanded = event.keystroke.key == "right";
-                                if expanded == collapsed.contains(&span.id) {
+                                .is_some_and(|next| next.depth > span.depth);
+                            let expanded = event.keystroke.key == "right";
+                            if branch && expanded == collapsed.contains(&span.id) {
+                                if let Some(toggle) = &toggle {
                                     toggle(span.id.clone(), expanded, window, cx);
+                                    cx.stop_propagation();
                                 }
-                                cx.stop_propagation();
+                                None
+                            } else if expanded {
+                                branch.then_some(at + 1)
+                            } else {
+                                indices.borrow().parent(index)
                             }
+                        } else {
+                            None
                         }
-                        None
                     }
                     _ => None,
                 };
+                let source_index = next.and_then(|next| indices.borrow().get(next));
                 if let Some(next) = next
-                    && let Some(index) = indices.get(next)
+                    && let Some(index) = source_index
                     && let Some(select) = &on_select
                 {
-                    select(spans[*index].id.clone(), window, cx);
+                    select(spans[index].id.clone(), window, cx);
                     // The previously focused row may leave the virtual window.
                     // Keep keyboard navigation on the persistent container.
                     focus.focus(window, cx);
@@ -817,6 +1110,13 @@ fn waterfall(
             .focus_ring(&theme)
             .on_scroll_wheel(move |event, window, cx| wheel(event, window, cx));
     }
+    frame = frame.children(range::render(
+        &ident.child("time-selection"),
+        &options,
+        (left_gutter, right_gutter),
+        window,
+        cx,
+    ));
     frame
         .semantic_in(
             cx,
@@ -992,6 +1292,13 @@ fn span_row(
         }))
     };
 
+    let fill = fill.semantic_in(
+        cx,
+        NodeSpec::new(ident.child("interval").semantic_id(), Role::Image)
+            .parent(ident.semantic_id())
+            .text(span.label.clone())
+            .value(span.state.name()),
+    );
     let mut track = div()
         .relative()
         .size_full()
@@ -1151,12 +1458,55 @@ fn span_row(
     if branch {
         spec = spec.expanded(expanded);
     }
-    if let Some(detail) = &span.detail {
-        spec = spec.description(detail.clone());
+    let readout = exact_readout(span, &status, options.formatter.as_ref(), cx.strings());
+    spec = spec.description(readout.clone());
+    row.tip(ident, readout)
+        .semantic_in(cx, spec)
+        .into_any_element()
+}
+
+fn format_endpoint(
+    value: f64,
+    formatter: Option<&TimeFormatter>,
+    strings: &crate::strings::Strings,
+) -> SharedString {
+    formatter.map_or_else(
+        || strings.format(StringKey::TimeUtcValue, &[&value.to_string()]),
+        |format| format(value),
+    )
+}
+
+fn exact_readout(
+    span: &TraceSpan,
+    status: &str,
+    formatter: Option<&TimeFormatter>,
+    strings: &crate::strings::Strings,
+) -> SharedString {
+    let interval = if let Some([start, end]) = span.time {
+        strings.format(
+            StringKey::TraceInterval,
+            &[
+                &format_endpoint(start, formatter, strings),
+                &format_endpoint(end, formatter, strings),
+            ],
+        )
     } else {
-        spec = spec.description(status);
+        strings.format(
+            StringKey::TraceNormalizedInterval,
+            &[&span.start.to_string(), &span.end.to_string()],
+        )
+    };
+    let mut text = strings
+        .format(StringKey::TraceReadout, &[&span.label, status, &interval])
+        .to_string();
+    if let Some(duration) = &span.duration {
+        text.push('\n');
+        text.push_str(&strings.format(StringKey::TraceDuration, &[duration]));
     }
-    row.semantic_in(cx, spec).into_any_element()
+    if let Some(detail) = &span.detail {
+        text.push_str(&format!("\n{detail}"));
+    }
+    text.into()
 }
 
 fn axis_row(
@@ -1239,6 +1589,151 @@ fn axis_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn time_motion_keeps_epoch_precision_retargets_continuously_and_snaps_reversal() {
+        let epoch = 1_700_000_000_000.;
+        let scale = |a, b| {
+            NumericScale::new(ScaleKind::Time, [epoch + a, epoch + b]).expect("fixture domain")
+        };
+        let spec = motion::MotionSpec::new(1000, motion::CubicBezier::new(0., 0., 1., 1.));
+        let mut transition = ViewportMotion::new(scale(0., 100.), spec);
+        transition.target(scale(17., 151.), spec, false);
+        transition
+            .start
+            .advance(std::time::Duration::from_millis(500));
+        transition
+            .end
+            .advance(std::time::Duration::from_millis(500));
+        assert_eq!(transition.start.value(), epoch + 8.5);
+        assert_eq!(transition.end.value(), epoch + 125.5);
+        transition.target(scale(-11., 79.), spec, false);
+        assert_eq!(transition.start.value(), epoch + 8.5);
+        assert_eq!(transition.end.value(), epoch + 125.5);
+        transition.target(scale(200., 50.), spec, false);
+        assert_eq!(transition.start.value(), epoch + 200.);
+        assert_eq!(transition.end.value(), epoch + 50.);
+        transition.target(scale(0., 100.), spec, true);
+        assert_eq!(transition.start.value(), epoch);
+        assert_eq!(transition.end.value(), epoch + 100.);
+    }
+
+    #[test]
+    fn viewport_navigation_policy_preserves_orientation_during_extreme_narrowing_and_retarget() {
+        use gpui_kit_theme::Theme;
+
+        for theme in [Theme::studio_light(), Theme::studio_dark()] {
+            let spec = motion::MotionPolicy::spec(motion::MotionRole::Navigation, &theme);
+            assert!(!spec.is_sprung());
+            for reversed in [false, true] {
+                let scale = |mut domain: [f64; 2]| {
+                    if reversed {
+                        domain.reverse();
+                    }
+                    NumericScale::new(ScaleKind::Time, domain).expect("finite narrowing fixture")
+                };
+                let mut target = scale([1530.125, 1530.25]);
+                let mut state = ViewportMotion::new(scale([-2e9, 7e5]), spec);
+                state.target(target, spec, false);
+                for step in 0..400 {
+                    if step == 7 {
+                        target = scale([-95.75, -95.5]);
+                        state.target(target, spec, false);
+                    }
+                    state.start.advance(std::time::Duration::from_millis(5));
+                    state.end.advance(std::time::Duration::from_millis(5));
+                    // Check the policy itself, before the safety guard can snap.
+                    assert_ne!(state.start.value(), state.end.value());
+                    assert_eq!(state.start.value() > state.end.value(), reversed);
+                    let shown = state.sampled_viewport(target).domain();
+                    assert_eq!(shown[0] > shown[1], reversed);
+                }
+                assert_eq!(state.sampled_viewport(target), target);
+            }
+        }
+    }
+
+    #[test]
+    fn viewport_spring_endpoint_crossing_snaps_to_target_orientation() {
+        let spec = motion::MotionSpec::sprung(motion::Spring::new(170., 2., 1.));
+        for reversed in [false, true] {
+            let scale = |mut domain: [f64; 2]| {
+                if reversed {
+                    domain.reverse();
+                }
+                NumericScale::new(ScaleKind::Time, domain).expect("finite spring fixture")
+            };
+            let mut target = scale([1530.125, 1530.25]);
+            let mut state = ViewportMotion::new(scale([-2e9, 7e5]), spec);
+            state.target(target, spec, false);
+            let mut crossed = false;
+            for step in 0..400 {
+                if step == 6 {
+                    target = scale([-95.75, -95.5]);
+                    state.target(target, spec, false);
+                }
+                state.start.advance(std::time::Duration::from_millis(5));
+                state.end.advance(std::time::Duration::from_millis(5));
+                let inverted = (state.start.value() > state.end.value()) != reversed;
+                crossed |= inverted;
+                let shown = state.sampled_viewport(target).domain();
+                assert_eq!(shown[0] > shown[1], reversed);
+                assert_ne!(shown[0], shown[1]);
+                if inverted {
+                    assert_eq!(shown, target.domain());
+                    assert!(!state.start.is_animating());
+                    assert!(!state.end.is_animating());
+                }
+            }
+            assert!(crossed, "fixture must exercise actual spring inversion");
+        }
+    }
+
+    #[test]
+    fn readout_preserves_exact_raw_times_and_caller_duration_instead_of_tick_rounding() {
+        let span = TraceSpan::new("id", "Decode", 0., 1.)
+            .time(1_700_000_000_025.125, 1_700_000_000_099.875)
+            .duration("74.75 ms")
+            .detail("fixture");
+        assert_eq!(
+            exact_readout(
+                &span,
+                "Succeeded",
+                None,
+                &crate::strings::Strings::default()
+            )
+            .as_ref(),
+            "Decode · Succeeded\nStart: 1700000000025.125 ms UTC; End: 1700000000099.875 ms UTC\nDuration: 74.75 ms\nfixture"
+        );
+        assert_eq!(
+            exact_readout(
+                &TraceSpan::new("id", "Legacy", 0.125, 0.375),
+                "Pending",
+                None,
+                &crate::strings::Strings::default()
+            )
+            .as_ref(),
+            "Legacy · Pending\nStart: 0.125; End: 0.375 (normalized)"
+        );
+    }
+
+    pub(super) fn visible_indices(
+        spans: &[TraceSpan],
+        collapsed: &HashSet<SharedString>,
+    ) -> Vec<usize> {
+        let mut hidden_below = None;
+        spans
+            .iter()
+            .enumerate()
+            .filter_map(|(index, span)| {
+                if hidden_below.is_some_and(|depth| span.depth > depth) {
+                    return None;
+                }
+                hidden_below = collapsed.contains(&span.id).then_some(span.depth);
+                Some(index)
+            })
+            .collect()
+    }
 
     #[test]
     fn raw_intervals_clip_and_reverse_without_losing_epoch_precision() {
@@ -1329,22 +1824,31 @@ mod tests {
                         .time(1000. + i as f64, 1017. + i as f64)
                 })
                 .collect();
+            let spans = Rc::new(spans);
             let input = begin.elapsed();
             let begin = Instant::now();
-            let indices = visible_indices(&spans, &HashSet::new());
+            let mut indices = index::Hierarchy::default();
+            indices.update(&spans, &HashSet::new());
             let hierarchy = begin.elapsed();
+            let begin = Instant::now();
+            indices.update(&spans, &HashSet::new());
+            let retained = begin.elapsed();
+            let begin = Instant::now();
+            indices.update(&spans, &HashSet::from(["span.0".into()]));
+            let collapse = begin.elapsed();
+            assert_eq!(indices.len(), count - 15);
+            assert_eq!(indices.get(1), Some(16));
+            indices.update(&spans, &HashSet::new());
             let begin = Instant::now();
             let viewport =
                 NumericScale::new(ScaleKind::Time, [1000., 1200.]).expect("valid domain");
-            let mapped: Vec<_> = indices
-                .iter()
-                .take(12)
-                .map(|index| interval(&spans[*index], viewport))
+            let mapped: Vec<_> = (0..12)
+                .map(|index| interval(&spans[indices.get(index).expect("visible row")], viewport))
                 .collect();
             assert_eq!(mapped.len(), 12);
             assert_eq!(mapped[0], Some((0., 0.085)));
             eprintln!(
-                "trace spans={count} input={input:?} hierarchy={hierarchy:?} twelve_row_mapping={:?}; mount/paint=not measured",
+                "trace spans={count} input={input:?} hierarchy_build={hierarchy:?} retained_update={retained:?} collapse_branch={collapse:?} twelve_row_mapping={:?}; mount/paint=not measured",
                 begin.elapsed()
             );
         }

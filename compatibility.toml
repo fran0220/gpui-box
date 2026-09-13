@@ -10,6 +10,13 @@ edition = "2024"
 type_universe_package = "gpui-box"
 type_universe_crate = "gpui"
 
+[framework_paint_recording]
+contract = "PaintMark captures a same-window, same-frame contiguous balanced paint range. PaintRecording owns visible paint and leased sprite allocations, not elements or live authority. Replay normalizes ambient transform/opacity, applies a current-local offset once, and intersects current clipping with the moved capture-visible picture. Clipped or culled pixels never reappear."
+refusals = ["glass needs a frozen composited backdrop", "platform surfaces and hosted views", "frames containing deferred draws", "unbalanced ranges", "window/display-scale mismatch", "capture-time eviction or renderer reset", "atlases without leases", "zero/nonfinite capture opacity", "position-dependent replay edge fade"]
+linux = "Framework mounted input/IME/accessibility tests, WGPU lease eviction/reset and submission tests, and dynamic offscreen text/image/Kit semantic removal demonstration."
+native_acceptance = "Metal and Direct3D atlas leases and submission guards are implemented; macOS and Windows execution remains coordinator-owned and pending."
+lifetime = "Callers bound recording counts and retirement duration, dropping on completion/reinsertion/reduced motion. Final recording and frame release unpins only referenced allocations; reset invalidates all outstanding leases before reuse. Native leases remain Send + Sync for submission callbacks; Wasm leases stay thread-confined with browser GPU resources."
+
 [assigned_root_layout]
 contract = "Invocation-local assigned border box overrides authored root width/height/min/max/aspect ratio; descendants reflow and authored styles return for natural measurement. Padding/border minima and device rounding determine actual size. Drawable caches assignment mode and dimensions."
 commands = ["cargo test -p gpui-box --features test-support --lib assigned_root", "cargo test -p gpui-box-kit --all-features --test flip_configuration", "cargo test -p gpui-box-kit --all-features --lib motion::flip", "python3 crates/gpui-kit/tests/flip_playback.py target/flip-playback"]

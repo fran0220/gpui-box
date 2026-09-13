@@ -3,10 +3,7 @@ use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::layout::measure;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
-use gpui::{
-    App, Bounds, FillOptions, FillRule, Hsla, MouseButton, PathBuilder, PathStyle, Pixels,
-    RenderOnce, Window, canvas, div, point, prelude::*, px,
-};
+use gpui::{App, Bounds, Hsla, Pixels, RenderOnce, Window, canvas, div, point, prelude::*, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, Surface, TypeScale};
 use std::rc::Rc;
@@ -63,9 +60,10 @@ pub enum GeoEvent {
 type Handler = Rc<dyn Fn(GeoEvent, &mut Window, &mut App)>;
 
 /// A controlled local map with choropleth legend, selectable feature readout,
-/// and point overlays. Click selects projected geometry. Wheel pans; Ctrl-wheel
-/// zooms about the pointer. Arrow keys pan, +/- zoom, Home resets, [/] cycle
-/// selection and Escape clears it. No handler means a read-only map.
+/// and point overlays. Click selects projected geometry; captured drag/touch
+/// pans and pinch/Ctrl-wheel zooms about the pointer. Arrow keys pan, +/- zoom,
+/// Home resets, F fits, [/] cycle selection. Escape cancels a drag or clears
+/// selection. No handler means a read-only map.
 #[derive(IntoElement)]
 pub struct GeoMap {
     ident: Ident,
@@ -74,6 +72,7 @@ pub struct GeoMap {
     viewport: GeoViewport,
     selected: Option<SharedString>,
     status_text: Option<SharedString>,
+    animate: bool,
     on_event: Option<Handler>,
 }
 
@@ -86,6 +85,7 @@ impl GeoMap {
             viewport: GeoViewport::default(),
             selected: None,
             status_text: None,
+            animate: true,
             on_event: None,
         }
     }
@@ -99,6 +99,13 @@ impl GeoMap {
     }
     pub fn selected(mut self, selected: Option<SharedString>) -> Self {
         self.selected = selected;
+        self
+    }
+    /// Animate accepted camera, style, and keyed geometry opacity targets.
+    /// Direct input and reduced motion snap. Retired shapes are decorative;
+    /// vertices never interpolate through invalid topology. Readouts use target values.
+    pub fn animate(mut self, animate: bool) -> Self {
+        self.animate = animate;
         self
     }
     /// Caller-owned complete status/reason wording, including localized input
@@ -175,10 +182,70 @@ impl RenderOnce for GeoMap {
                         .description(phase.name()),
                 ),
             );
+        let measured = measure::cell(&self.ident.child("bounds").semantic_id(), window, cx);
+        let exploration = crate::foundation::window_state::with_key(
+            &self.ident.child("exploration").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+            |state: &mut Rc<std::cell::RefCell<exploration::Exploration>>| state.clone(),
+        );
+        let manipulated = exploration.borrow().direct || exploration.borrow().active();
+        let presentation = crate::motion::keyed::slot::<presentation::Presentation>(
+            &self.ident.child("geometry-motion").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        if data.is_none() {
+            presentation.borrow_mut().clear();
+        }
+        exploration.borrow_mut().sync(
+            data.as_ref(),
+            extent(measured.get()),
+            self.on_event.is_some(),
+            window,
+        );
         if let Some(data) = data {
-            let viewport = self.viewport;
-            let measured = measure::cell(&self.ident.child("bounds").semantic_id(), window, cx);
+            let direct = {
+                let mut interaction = exploration.borrow_mut();
+                let direct = interaction.direct || interaction.active();
+                interaction.direct = false;
+                direct
+            };
+            let viewport = crate::motion::tracked_or_snap(
+                &self.ident.child("camera-motion").semantic_id(),
+                self.viewport,
+                crate::motion::resize(&theme),
+                direct || !self.animate,
+                window,
+                cx,
+            );
+            let presented = presentation.borrow_mut().sample(
+                data.clone(),
+                crate::motion::state_change(&theme),
+                manipulated || !self.animate,
+                window,
+                cx,
+            );
+            let mut colors = std::collections::HashMap::new();
+            for index in data.visible_indices(viewport, extent(measured.get())) {
+                if let Some(feature) = data.features.get(index) {
+                    let fill = crate::motion::tracked_or_snap(
+                        &self
+                            .ident
+                            .child("fill-motion")
+                            .child(feature.id.as_ref())
+                            .semantic_id(),
+                        color(&data, feature.value, &theme),
+                        crate::motion::state_change(&theme),
+                        !self.animate,
+                        window,
+                        cx,
+                    );
+                    colors.insert(index, fill);
+                }
+            }
             let paint_data = data.clone();
+            let paint_frame = presented.clone();
             let paint_selected = self.selected.clone();
             let paint_theme = theme.clone();
             let paint_bounds = measured.clone();
@@ -194,151 +261,131 @@ impl RenderOnce for GeoMap {
                         move |bounds, window, _| measure::record(&paint_bounds, bounds, window),
                         move |bounds, _, window, _| {
                             let size = extent(bounds);
-                            let at = |p| {
-                                let p = viewport.screen(p, size);
-                                point(
-                                    bounds.left() + px(p[0] as f32),
-                                    bounds.top() + px(p[1] as f32),
-                                )
+                            let mut paint = painting::Paint {
+                                viewport,
+                                bounds,
+                                theme: &paint_theme,
+                                selected: None,
                             };
-                            for (polygons, feature) in
-                                paint_data.polygons.iter().zip(&paint_data.features)
-                            {
-                                let color = color(&paint_data, feature.value, &paint_theme);
-                                for polygon in polygons {
-                                    let mut fill = PathBuilder::fill().with_style(PathStyle::Fill(
-                                        FillOptions::default().with_fill_rule(FillRule::EvenOdd),
-                                    ));
-                                    let mut stroke = PathBuilder::stroke(px(
-                                        if paint_selected.as_ref() == Some(&feature.id) {
-                                            paint_theme.borders.thick
-                                        } else {
-                                            paint_theme.borders.hairline
-                                        },
-                                    ));
-                                    for ring in
-                                        std::iter::once(&polygon.exterior).chain(&polygon.holes)
-                                    {
-                                        fill.move_to(at(ring[0]));
-                                        stroke.move_to(at(ring[0]));
-                                        for p in &ring[1..] {
-                                            fill.line_to(at(*p));
-                                            stroke.line_to(at(*p));
-                                        }
-                                        fill.close();
-                                        stroke.close();
-                                    }
-                                    if let Ok(path) = fill.build() {
-                                        window.paint_path(path, color);
-                                    }
-                                    if let Ok(path) = stroke.build() {
-                                        window.paint_path(
-                                            path,
-                                            if paint_selected.as_ref() == Some(&feature.id) {
-                                                paint_theme.colors.text
-                                            } else {
-                                                paint_theme.colors.hairline_strong
-                                            },
-                                        );
-                                    }
-                                }
+                            for (shape, alpha) in &paint_frame.retired {
+                                paint.draw(&shape.data, shape.index, None, *alpha, window);
                             }
-                            for (p, source) in
-                                paint_data.projected_points.iter().zip(&paint_data.points)
-                            {
-                                let center = at(*p);
-                                let mut circle = PathBuilder::fill();
-                                for i in 0..24 {
-                                    let angle = i as f32 * std::f32::consts::TAU / 24.0;
-                                    let p = point(
-                                        center.x + px(5.0 * angle.cos()),
-                                        center.y + px(5.0 * angle.sin()),
-                                    );
-                                    if i == 0 {
-                                        circle.move_to(p);
-                                    } else {
-                                        circle.line_to(p);
-                                    }
-                                }
-                                circle.close();
-                                if let Ok(path) = circle.build() {
-                                    window.paint_path(
-                                        path,
-                                        if paint_selected.as_ref() == Some(&source.id) {
-                                            paint_theme.colors.text
-                                        } else {
-                                            paint_theme.colors.warning
-                                        },
-                                    );
-                                }
+                            paint.selected = paint_selected.as_ref();
+                            let candidates = paint_data.visible_indices(viewport, size);
+                            for index in candidates {
+                                paint.draw(
+                                    &paint_data,
+                                    index,
+                                    colors.get(&index).copied(),
+                                    paint_frame.opacity(index),
+                                    window,
+                                );
                             }
                         },
                     )
                     .size_full(),
                 );
-            for (index, bounds) in data.visual_bounds(viewport, extent(measured.get())) {
-                let (id, label, value) = if let Some(f) = data.features.get(index) {
-                    (
-                        &f.id,
-                        f.label.clone(),
-                        if f.value.is_some() {
-                            f.formatted_value.clone()
-                        } else {
-                            data.domain.missing_label.clone()
-                        },
-                    )
+            let geometry_data = data.clone();
+            let geometry_frame = presented.clone();
+            let geometry_ident = self.ident.child("geometry");
+            let geometry_selected = self.selected.clone();
+            frame = frame.child(
+                gpui_kit_semantics::MeasuredLeafBatch::new(
+                    self.ident.child("geometry-targets").semantic_id(),
+                    move |current, _, _| {
+                        geometry_data
+                            .visual_bounds(viewport, extent(current))
+                            .into_iter()
+                            .filter(|(index, _)| geometry_frame.opacity(*index) > 0.0)
+                            .map(|(index, bounds)| {
+                                let (id, label, value) = geometry_data.readout(index);
+                                gpui_kit_semantics::MeasuredLeaf::new(
+                                    geometry_ident.child(id.as_ref()).semantic_id(),
+                                    gpui_kit_semantics::MeasuredLeafRole::Image,
+                                    Bounds::new(
+                                        current.origin
+                                            + point(px(bounds[0] as f32), px(bounds[1] as f32)),
+                                        gpui::size(px(bounds[2] as f32), px(bounds[3] as f32)),
+                                    ),
+                                )
+                                .text(label.clone())
+                                .value(value)
+                                .selected(geometry_selected.as_ref() == Some(id))
+                                .read_only(true)
+                            })
+                            .collect()
+                    },
+                )
+                .diagnostic_parent(self.ident.child("map").semantic_id())
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            );
+            if let Some(at) = exploration
+                .borrow()
+                .hover
+                .filter(|at| measured.get().contains(at))
+                && let Some(id) = presented.hit_test(
+                    viewport,
+                    extent(measured.get()),
+                    exploration::local(at, measured.get()),
+                )
+            {
+                let index = data
+                    .features
+                    .iter()
+                    .position(|f| f.id == id)
+                    .or_else(|| {
+                        data.points
+                            .iter()
+                            .position(|p| p.id == id)
+                            .map(|i| i + data.features.len())
+                    })
+                    .expect("hit names source geometry");
+                let (_, label, value) = data.readout(index);
+                let text = if value.is_empty() {
+                    label.to_string()
                 } else {
-                    let p = &data.points[index - data.features.len()];
-                    (&p.id, p.label.clone(), SharedString::default())
+                    format!("{label}: {value}")
                 };
-                frame = frame.child(
-                    div()
-                        .absolute()
-                        .left(px(bounds[0] as f32))
-                        .top(px(bounds[1] as f32))
-                        .w(px(bounds[2] as f32))
-                        .h(px(bounds[3] as f32))
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(
-                                self.ident
-                                    .child("geometry")
-                                    .child(id.as_ref())
-                                    .semantic_id(),
-                                Role::Image,
-                            )
-                            .parent(self.ident.child("map").semantic_id())
-                            .text(label)
-                            .value(value)
-                            .selected(self.selected.as_ref() == Some(id))
-                            .read_only(true),
+                body = body.child(
+                    crate::overlay::Overlay::new(self.ident.child("hover"))
+                        .layer(gpui_kit_theme::Layer::Tooltip)
+                        .placement(crate::overlay::Placement::At(
+                            at + point(px(12.0), px(12.0)),
+                        ))
+                        .child(
+                            div()
+                                .surface(&theme, Surface::Raised)
+                                .p_token(&theme, Space::Sm)
+                                .child(text.clone())
+                                .semantic_in(
+                                    cx,
+                                    NodeSpec::new(
+                                        self.ident.child("hover-readout").semantic_id(),
+                                        Role::Status,
+                                    )
+                                    .text(text)
+                                    .value(id),
+                                ),
                         ),
                 );
             }
             if let Some(handler) = self.on_event.clone() {
-                let pointer_data = data.clone();
-                let pointer_bounds = measured.clone();
-                let pointer_handler = handler.clone();
-                frame = frame.tab_index(0).focus_ring(&theme).on_mouse_down(
-                    MouseButton::Left,
-                    move |event, window, cx| {
-                        let bounds = pointer_bounds.get();
-                        let local = [
-                            f64::from(f32::from(event.position.x - bounds.left())),
-                            f64::from(f32::from(event.position.y - bounds.top())),
-                        ];
-                        pointer_handler(
-                            GeoEvent::Select(pointer_data.hit_test(
-                                viewport,
-                                extent(bounds),
-                                local,
-                            )),
-                            window,
-                            cx,
-                        );
-                    },
+                frame = exploration::install(
+                    frame.tab_index(0).focus_ring(&theme),
+                    exploration.clone(),
+                    measured.clone(),
+                    viewport,
+                    presented.clone(),
+                    handler.clone(),
+                    self.ident.child("gesture").element_id(),
                 );
                 let wheel_handler = handler.clone();
+                let fit_bounds = measured.clone();
+                let fit_data = data.clone();
+                let wheel_state = exploration.clone();
                 frame = frame.on_scroll_wheel(move |event, window, cx| {
                     let bounds = measured.get();
                     let size = extent(bounds);
@@ -362,6 +409,7 @@ impl RenderOnce for GeoMap {
                             -f64::from(f32::from(delta.y)) / scale,
                         )
                     };
+                    wheel_state.borrow_mut().direct = true;
                     wheel_handler(GeoEvent::Viewport(next), window, cx);
                     cx.stop_propagation();
                 });
@@ -373,9 +421,27 @@ impl RenderOnce for GeoMap {
                     .collect();
                 let selected = self.selected.clone();
                 frame = frame.on_key_down(move |event, window, cx| {
+                    if event.keystroke.key == "escape" && exploration.borrow().active() {
+                        let restore = exploration.borrow_mut().cancel();
+                        window.release_pointer();
+                        if let Some(camera) = restore {
+                            handler(GeoEvent::Viewport(camera), window, cx);
+                        }
+                        cx.stop_propagation();
+                        window.refresh();
+                        return;
+                    }
+                    if event.keystroke.key == "f" {
+                        if let Some(fit) = fit_data.fit_viewport(extent(fit_bounds.get()), 16.0) {
+                            handler(GeoEvent::Viewport(fit), window, cx);
+                        }
+                        cx.stop_propagation();
+                        return;
+                    }
                     if let Some(action) =
                         key_event(&event.keystroke.key, viewport, &ids, selected.as_ref())
                     {
+                        exploration.borrow_mut().direct = true;
                         handler(action, window, cx);
                         cx.stop_propagation();
                     }
@@ -427,73 +493,104 @@ impl RenderOnce for GeoMap {
                         ),
                     ),
             );
-            let mut readout = div().row().flex_wrap().gap_token(&theme, Space::Sm);
-            for (id, label, value) in data
-                .features
-                .iter()
-                .map(|f| {
-                    (
-                        &f.id,
-                        &f.label,
-                        if f.value.is_some() {
-                            f.formatted_value.clone()
+            let count = data.features.len() + data.points.len();
+            if count > 32 {
+                let source = data.clone();
+                let ident = self.ident.clone();
+                let read_only = self.on_event.is_none();
+                let mut readout = crate::data::List::new(
+                    self.ident.child("feature"),
+                    count,
+                    move |index, _, cx| {
+                        let (id, label, value) = source.readout(index);
+                        let text = if value.is_empty() {
+                            label.to_string()
                         } else {
-                            data.domain.missing_label.clone()
-                        },
-                    )
-                })
-                .chain(
-                    data.points
-                        .iter()
-                        .map(|p| (&p.id, &p.label, SharedString::default())),
-                )
-            {
-                let selected = self.selected.as_ref() == Some(id);
-                let mut target = div()
-                    .id(self.ident.child("feature").child(id.as_ref()).element_id())
-                    .px(px(theme.spacing.xs))
-                    .py(px(theme.spacing.xs))
-                    .bg(theme
-                        .colors
-                        .control_hover
-                        .opacity(if selected { 1.0 } else { 0.0 }))
-                    .child(if value.is_empty() {
-                        label.to_string()
-                    } else {
-                        format!("{label}: {value}")
-                    });
-                if let Some(handler) = self.on_event.clone() {
-                    let click_id = id.clone();
-                    let key_id = id.clone();
-                    let key_handler = handler.clone();
-                    target = target
-                        .tab_index(0)
-                        .focus_ring(&theme)
-                        .on_click(move |_, window, cx| {
-                            handler(GeoEvent::Select(Some(click_id.clone())), window, cx)
-                        })
-                        .on_key_down(move |event, window, cx| {
-                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                key_handler(GeoEvent::Select(Some(key_id.clone())), window, cx);
-                                cx.stop_propagation();
-                            }
-                        });
-                }
-                readout = readout.child(
-                    target.semantic_in(
-                        cx,
-                        NodeSpec::new(
-                            self.ident.child("feature").child(id.as_ref()).semantic_id(),
-                            Role::Button,
+                            format!("{label}: {value}")
+                        };
+                        crate::data::ListItem::new(
+                            id.clone(),
+                            div().child(text.clone()).semantic_in(
+                                cx,
+                                NodeSpec::new(
+                                    ident.child("reading").child(id.as_ref()).semantic_id(),
+                                    Role::Text,
+                                )
+                                .text(label.clone())
+                                .value(value)
+                                .read_only(read_only),
+                            ),
                         )
-                        .text(label.clone())
-                        .value(value)
-                        .selected(selected)
-                        .read_only(self.on_event.is_none()),
-                    ),
+                        .text(text)
+                    },
+                )
+                .visible_rows(6)
+                .keys(
+                    data.features
+                        .iter()
+                        .map(|f| f.id.clone())
+                        .chain(data.points.iter().map(|p| p.id.clone())),
                 );
+                if let Some(selected) = &self.selected {
+                    readout = readout.selected(selected.clone());
+                }
+                if let Some(handler) = self.on_event.clone() {
+                    readout = readout.on_select(move |id, window, cx| {
+                        handler(GeoEvent::Select(Some(id)), window, cx)
+                    });
+                }
+                body = body.child(readout);
+            } else {
+                let mut readout = div().row().flex_wrap().gap_token(&theme, Space::Sm);
+                for index in 0..count {
+                    let (id, label, value) = data.readout(index);
+                    let selected = self.selected.as_ref() == Some(id);
+                    let mut target = div()
+                        .id(self.ident.child("feature").child(id.as_ref()).element_id())
+                        .px(px(theme.spacing.xs))
+                        .py(px(theme.spacing.xs))
+                        .bg(theme
+                            .colors
+                            .control_hover
+                            .opacity(if selected { 1.0 } else { 0.0 }))
+                        .child(if value.is_empty() {
+                            label.to_string()
+                        } else {
+                            format!("{label}: {value}")
+                        });
+                    if let Some(handler) = self.on_event.clone() {
+                        let click_id = id.clone();
+                        let key_id = id.clone();
+                        let key_handler = handler.clone();
+                        target = target
+                            .tab_index(0)
+                            .focus_ring(&theme)
+                            .on_click(move |_, window, cx| {
+                                handler(GeoEvent::Select(Some(click_id.clone())), window, cx)
+                            })
+                            .on_key_down(move |event, window, cx| {
+                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    key_handler(GeoEvent::Select(Some(key_id.clone())), window, cx);
+                                    cx.stop_propagation();
+                                }
+                            });
+                    }
+                    readout = readout.child(
+                        target.semantic_in(
+                            cx,
+                            NodeSpec::new(
+                                self.ident.child("feature").child(id.as_ref()).semantic_id(),
+                                Role::Button,
+                            )
+                            .text(label.clone())
+                            .value(value)
+                            .selected(selected)
+                            .read_only(self.on_event.is_none()),
+                        ),
+                    );
+                }
+                body = body.child(readout);
             }
-            body = body.child(readout);
         }
         body.semantic_in(
             cx,
@@ -513,7 +610,7 @@ fn extent(bounds: Bounds<Pixels>) -> [f64; 2] {
     ]
 }
 
-fn color(data: &GeoData, value: Option<f64>, theme: &gpui_kit_theme::Theme) -> Hsla {
+pub(super) fn color(data: &GeoData, value: Option<f64>, theme: &gpui_kit_theme::Theme) -> Hsla {
     value.map_or(theme.colors.control_hover, |value| {
         let fraction =
             ((value - data.domain.minimum) / (data.domain.maximum - data.domain.minimum)) as f32;

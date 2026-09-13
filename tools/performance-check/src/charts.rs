@@ -4,10 +4,11 @@
 //! a sparse viewport bounds semantic mounting, not total work.
 
 use super::*;
+use gpui::prelude::FluentBuilder;
 use gpui::{Modifiers, MouseMoveEvent, ScrollDelta, ScrollWheelEvent, TouchPhase, point, px};
 use gpui_kit::display::chart::{
     ChartSelection,
-    cartesian::{CartesianChart, CartesianEvent},
+    cartesian::{CartesianChart, CartesianEvent, CartesianMotion, CartesianRange, PathSampling},
     data::{ChartScale, ChartValue, RawPoint, RawSeries, SeriesMark, ValueAxis, project},
     scale::{NumericScale, ScaleKind},
 };
@@ -145,16 +146,18 @@ fn run_case(items: usize, dense: bool, animate: bool) -> Result<Vec<serde_json::
     let hovered = Rc::new(RefCell::new(None));
     let events = Rc::new(RefCell::new(Vec::new()));
     let builds = Rc::new(Cell::new(0u64));
+    let overview = Rc::new(Cell::new(false));
     let mut cx = TestAppContext::single();
     let mut harness = Harness::new(&mut cx, gpui_kit::install, |_, _| div().into_any_element());
     let build = {
-        let (series, viewport, selected, hovered, events, builds) = (
+        let (series, viewport, selected, hovered, events, builds, overview) = (
             series.clone(),
             viewport.clone(),
             selected.clone(),
             hovered.clone(),
             events.clone(),
             builds.clone(),
+            overview.clone(),
         );
         move |_: &mut gpui::Window, _: &mut gpui::App| {
             builds.set(builds.get() + 1);
@@ -170,6 +173,33 @@ fn run_case(items: usize, dense: bool, animate: bool) -> Result<Vec<serde_json::
                     )
                     .shared_series(series.borrow().clone())
                     .animate(animate)
+                    .motion(CartesianMotion {
+                        enter: gpui_kit::motion::MotionSpec::new(
+                            400,
+                            gpui_kit::motion::CubicBezier::new(0., 0., 1., 1.),
+                        ),
+                        update: gpui_kit::motion::MotionSpec::new(
+                            400,
+                            gpui_kit::motion::CubicBezier::new(0., 0., 1., 1.),
+                        ),
+                        exit: gpui_kit::motion::MotionSpec::new(
+                            400,
+                            gpui_kit::motion::CubicBezier::new(0., 0., 1., 1.),
+                        ),
+                    })
+                    .when(overview.get(), |chart| {
+                        chart
+                            .sampling(PathSampling::MinMax)
+                            .range(CartesianRange::new(
+                                NumericScale::new(
+                                    ScaleKind::Linear,
+                                    [raw_x(0) - 5., raw_x(items - 1) + 5.],
+                                )
+                                .expect("overview domain"),
+                                Some(domain),
+                                "Selected source interval",
+                            ))
+                    })
                     .selected(selected.borrow().clone())
                     .hovered(hovered.borrow().clone())
                     .height(240.)
@@ -349,17 +379,170 @@ fn run_case(items: usize, dense: bool, animate: bool) -> Result<Vec<serde_json::
         "accepted viewport did not render original data at proposed coordinates"
     );
 
+    // The original rows above run with the harness's settling defaults. These
+    // additional rows explicitly opt into a real simulated motion clock.
+    harness.update(|_, cx| cx.set_reduce_motion(false));
+    let before_y = moved.bounds.center().1;
+    let plot_bounds = plot.bounds;
+    let source_index = series.borrow()[0]
+        .points
+        .iter()
+        .position(|p| p.id == expected_raw.id)
+        .context("source key")?;
+    builds.set(0);
+    let (_, prepare) = measured(|| {
+        let mut data = series.borrow_mut();
+        let point = &mut Rc::make_mut(&mut data)[0].points[source_index];
+        point.y = Some(17.25);
+        point.formatted = "17.25 exact units".into();
+    });
+    phases.push(("active-update-preparation", prepare));
+    let (_, retarget) = measured(|| harness.frame());
+    phases.push((
+        "active-update-retarget",
+        frame_report(&mut harness, retarget, builds.get()),
+    ));
+    builds.set(0);
+    let (_, moving) = measured(|| harness.advance(std::time::Duration::from_millis(64)));
+    phases.push((
+        "active-update-64ms",
+        frame_report(&mut harness, moving, builds.get()),
+    ));
+    let middle = harness
+        .current_snapshot()
+        .find(&mark_id)
+        .context("moving original key")?
+        .clone();
+    let target_y = plot_bounds.y + plot_bounds.height * (1. - 0.1725);
+    anyhow::ensure!(
+        middle.value.as_deref() == Some("17.25 exact units"),
+        "motion changed exact current value"
+    );
+    if animate {
+        anyhow::ensure!(
+            middle.bounds.center().1 > before_y && middle.bounds.center().1 < target_y,
+            "64ms must be genuinely intermediate"
+        );
+    } else {
+        anyhow::ensure!(
+            (middle.bounds.center().1 - target_y).abs() < 1.,
+            "disabled animation must be direct"
+        );
+    }
+    builds.set(0);
+    let (_, interrupt) = measured(|| {
+        let mut data = series.borrow_mut();
+        let point = &mut Rc::make_mut(&mut data)[0].points[source_index];
+        point.y = Some(81.25);
+        point.formatted = "81.25 exact units".into();
+        drop(data);
+        harness.frame();
+    });
+    phases.push((
+        "interruption-retarget",
+        frame_report(&mut harness, interrupt, builds.get()),
+    ));
+    let interrupted = harness
+        .current_snapshot()
+        .find(&mark_id)
+        .context("interrupted key")?
+        .clone();
+    if animate {
+        anyhow::ensure!(
+            (interrupted.bounds.center().1 - middle.bounds.center().1).abs() < 0.1,
+            "retarget jumped displayed geometry"
+        );
+    }
+    builds.set(0);
+    let (_, moving) = measured(|| harness.advance(std::time::Duration::from_millis(64)));
+    phases.push((
+        "interruption-64ms",
+        frame_report(&mut harness, moving, builds.get()),
+    ));
+    builds.set(0);
+    let replacement = scale.pan(0.07).expect("replacement viewport");
+    viewport.set(replacement);
+    let (_, direct) = measured(|| harness.frame());
+    phases.push((
+        "active-viewport-replacement",
+        frame_report(&mut harness, direct, builds.get()),
+    ));
+    let snapshot = harness.current_snapshot();
+    let current = snapshot
+        .find(&mark_id)
+        .context("replaced viewport source")?;
+    let bounds = snapshot
+        .find("perf.cartesian.plot")
+        .context("replaced viewport plot")?
+        .bounds;
+    anyhow::ensure!(
+        (current.bounds.center().0
+            - (bounds.x
+                + bounds.width * replacement.map(raw_x(target)).expect("raw x projects") as f32))
+            .abs()
+            < 1.
+            && (current.bounds.center().1 - (bounds.y + bounds.height * (1. - 0.8125))).abs() < 1.,
+        "viewport replacement must settle exact current geometry"
+    );
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+    harness.frame();
+    builds.set(0);
+    overview.set(true);
+    let (_, mount) = measured(|| harness.frame());
+    phases.push((
+        "overview-mount",
+        frame_report(&mut harness, mount, builds.get()),
+    ));
+    harness.frame();
+    builds.set(0);
+    let (_, resting) = measured(|| harness.frame());
+    phases.push((
+        "overview-settled-redraw",
+        frame_report(&mut harness, resting, builds.get()),
+    ));
+    let selection = harness
+        .bounds("perf.cartesian.range.selection")
+        .context("overview selection")?;
+    builds.set(0);
+    let (_, preview) = measured(|| {
+        harness.context().simulate_mouse_down(
+            selection.center(),
+            gpui::MouseButton::Left,
+            Modifiers::none(),
+        );
+        harness.context().simulate_mouse_move(
+            selection.center() + point(px(31.), px(0.)),
+            gpui::MouseButton::Left,
+            Modifiers::none(),
+        );
+        harness.frame();
+    });
+    phases.push((
+        "overview-refused-preview",
+        frame_report(&mut harness, preview, builds.get()),
+    ));
+    harness.update(|window, cx| {
+        window.dispatch_event(
+            gpui::PlatformInput::MouseCancelled(gpui::MouseCancelEvent),
+            cx,
+        );
+    });
+    harness.update(|window, _| window.remove_window());
+
     Ok(phases.into_iter().map(|(phase, mut report)| {
         report["name"] = "cartesian-chart".into();
         report["phase"] = phase.into();
         report["dataset_items"] = items.into();
         report["full_domain"] = dense.into();
         report["animate"] = animate.into();
+        report["explicit_active_clock"] = (phase.starts_with("active-") || phase.starts_with("interruption-")).into();
+        report["overview_enabled"] = phase.starts_with("overview-").into();
         report["shared_input"] = true.into();
         report["raw_items_after_append"] = (items + 1).into();
         let offered = if matches!(phase, "input-preparation" | "projection" | "mount" | "settled-redraw") { items } else { items + 1 };
         report["raw_items_in_phase"] = offered.into();
-        report["caller_cloned_points"] = if phase == "append" { items } else { 0 }.into();
+        report["caller_cloned_points"] = match phase {"append"=>items,"active-update-preparation"|"interruption-retarget"=>items+1,_=>0}.into();
+        report["verified_current_y"] = if phase.starts_with("active-update") {17.25} else if phase.starts_with("interruption") || phase.starts_with("overview") || phase=="active-viewport-replacement" {81.25} else {91.25}.into();
         report["total_work_bounded"] = false.into();
         report["evidence_scope"] = "Harness CPU layout/prepaint/paint and real input dispatch; not GPU/FPS evidence; shared immutable input reuses projection, but hit construction and enabled motion still scan all inputs".into();
         report["verified_original"] = serde_json::json!({"series": SERIES, "id": expected_raw.id.as_ref(), "x": raw_x(target), "y": expected_raw.y, "formatted": expected_raw.formatted.as_ref()});

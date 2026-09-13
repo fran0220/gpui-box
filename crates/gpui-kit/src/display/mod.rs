@@ -34,5 +34,5 @@ pub mod trace;
 
 pub use geography::{
     GeoColorDomain, GeoData, GeoEvent, GeoFeature, GeoMap, GeoPoint, GeoPolygon, GeoPosition,
-    GeoProjected, GeoProjection, GeoRefusal, GeoState, GeoViewport,
+    GeoProjected, GeoProjection, GeoProperties, GeoRefusal, GeoState, GeoViewport, GeoWorldPolicy,
 };

@@ -37,6 +37,7 @@ struct WgpuAtlasState {
     storage: WgpuAtlasStorage,
     tiles_by_key: FxHashMap<AtlasKey, AtlasTile>,
     pending_uploads: Vec<PendingUpload>,
+    leases: gpui::AtlasLeaseRegistry,
 }
 
 pub struct WgpuTextureInfo {
@@ -58,6 +59,7 @@ impl WgpuAtlas {
             storage: WgpuAtlasStorage::default(),
             tiles_by_key: Default::default(),
             pending_uploads: Vec::new(),
+            leases: Default::default(),
         }))
     }
 
@@ -86,6 +88,7 @@ impl WgpuAtlas {
     /// Use this for incremental recovery when the device is still valid.
     pub fn clear(&self) {
         let mut lock = self.0.lock();
+        lock.leases.invalidate();
         lock.storage = WgpuAtlasStorage::default();
         lock.tiles_by_key.clear();
         lock.pending_uploads.clear();
@@ -95,6 +98,7 @@ impl WgpuAtlas {
     /// The atlas will lazily recreate textures as needed on subsequent frames.
     pub fn handle_device_lost(&self, context: &WgpuContext) {
         let mut lock = self.0.lock();
+        lock.leases.invalidate();
         lock.device = context.device.clone();
         lock.queue = context.queue.clone();
         lock.color_texture_format = context.color_texture_format();
@@ -105,6 +109,22 @@ impl WgpuAtlas {
 }
 
 impl PlatformAtlas for WgpuAtlas {
+    fn resource_revision(&self) -> u64 {
+        self.0.lock().leases.revision()
+    }
+
+    fn retain_tiles(self: Arc<Self>, tiles: &[AtlasTile]) -> Option<gpui::AtlasLease> {
+        let mut lock = self.0.lock();
+        let atlas = self.clone();
+        lock.leases.pin_tiles(tiles, move |epoch, keys| {
+            let mut lock = atlas.0.lock();
+            let removed = lock.leases.release(epoch, keys);
+            for key in removed {
+                lock.remove(&key);
+            }
+        })
+    }
+
     fn get_or_insert_with<'a>(
         &self,
         key: &AtlasKey,
@@ -123,16 +143,26 @@ impl PlatformAtlas for WgpuAtlas {
                 .context("failed to allocate")?;
             lock.upload_texture(tile.texture_id, tile.bounds, &bytes);
             lock.tiles_by_key.insert(key.clone(), tile);
+            lock.leases.insert_tile(key.clone(), tile);
             Ok(Some(tile))
         }
     }
 
     fn remove(&self, key: &AtlasKey) {
-        let mut lock = self.0.lock();
+        self.0.lock().remove(key);
+    }
+}
 
+impl WgpuAtlasState {
+    fn remove(&mut self, key: &AtlasKey) {
+        let lock = self;
+        if lock.leases.defer_remove(key) {
+            return;
+        }
         let Some(tile) = lock.tiles_by_key.remove(key) else {
             return;
         };
+        lock.leases.remove_tile(tile);
         let id = tile.texture_id;
 
         let Some(texture_slot) = lock.storage[id.kind].textures.get_mut(id.index as usize) else {
@@ -404,6 +434,80 @@ mod tests {
     use gpui::block_on;
     use gpui::{ImageId, RenderImageParams};
     use std::sync::Arc;
+
+    #[test]
+    fn frozen_paint_leases_defer_only_owned_eviction_and_survive_reset_safely() -> anyhow::Result<()>
+    {
+        let _gpu = crate::serialised_gpu_test();
+        let context = WgpuContext::new_headless()?;
+        let atlas = Arc::new(WgpuAtlas::from_context(&context));
+        let key = AtlasKey::Image(RenderImageParams {
+            image_id: ImageId(819),
+            frame_index: 0,
+        });
+        let other = AtlasKey::Image(RenderImageParams {
+            image_id: ImageId(820),
+            frame_index: 0,
+        });
+        let build = || {
+            Ok(Some((
+                Size {
+                    width: DevicePixels(2),
+                    height: DevicePixels(3),
+                },
+                Cow::Owned(vec![255; 24]),
+            )))
+        };
+        let tile = atlas
+            .get_or_insert_with(&key, &mut { build })?
+            .expect("built image tile");
+        atlas.get_or_insert_with(&other, &mut { build })?;
+        let lease = atlas
+            .clone()
+            .retain_tiles(&[tile, tile])
+            .expect("live allocations can be leased");
+        let second = atlas
+            .clone()
+            .retain_tiles(&[tile])
+            .expect("independent lease");
+        atlas.remove(&key);
+        atlas.remove(&other);
+        assert!(atlas.0.lock().tiles_by_key.contains_key(&key));
+        assert!(!atlas.0.lock().tiles_by_key.contains_key(&other));
+        drop(lease);
+        assert!(atlas.0.lock().tiles_by_key.contains_key(&key));
+        drop(second);
+        assert!(!atlas.0.lock().tiles_by_key.contains_key(&key));
+        assert!(atlas.clone().retain_tiles(&[tile]).is_none());
+
+        let tile = atlas
+            .get_or_insert_with(&key, &mut { build })?
+            .expect("rebuilt image tile");
+        let old = atlas
+            .clone()
+            .retain_tiles(&[tile])
+            .expect("lease before clear");
+        atlas.remove(&key);
+        let revision = atlas.resource_revision();
+        atlas.clear();
+        assert!(atlas.resource_revision() > revision);
+        assert!(!old.is_valid());
+        atlas.get_or_insert_with(&key, &mut { build })?;
+        drop(old);
+        assert!(
+            atlas.0.lock().tiles_by_key.contains_key(&key),
+            "old lease drop must not evict a replacement generation"
+        );
+        let tile = atlas.0.lock().tiles_by_key[&key];
+        let lease = atlas
+            .clone()
+            .retain_tiles(&[tile])
+            .expect("lease before device reset");
+        atlas.handle_device_lost(&context);
+        assert!(!lease.is_valid());
+        assert!(atlas.0.lock().tiles_by_key.is_empty());
+        Ok(())
+    }
 
     fn test_device_and_queue() -> anyhow::Result<(Arc<wgpu::Device>, Arc<wgpu::Queue>)> {
         crate::assert_serialised_gpu_test();

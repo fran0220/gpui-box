@@ -259,6 +259,38 @@ impl ClipNodes {
         self.replay_with_cache(old, source, &mut collections::FxHashMap::default())
     }
 
+    pub(crate) fn replay_transformed(
+        &mut self,
+        old: ClipId,
+        source: &Self,
+        root: ClipId,
+        transform: crate::TransformationMatrix,
+        remapped: &mut collections::FxHashMap<ClipId, ClipId>,
+    ) -> ClipId {
+        let mut pending = Vec::new();
+        let mut cursor = old;
+        let mut parent = root;
+        while cursor != ClipId::NONE {
+            if let Some(mapped) = remapped.get(&cursor) {
+                parent = *mapped;
+                break;
+            }
+            let node = source.0[cursor.index as usize - 1];
+            pending.push((cursor, node));
+            cursor = node.parent;
+        }
+        for (old, mut node) in pending.into_iter().rev() {
+            node.parent = parent;
+            node.bounds = transform.transform_bounds(node.bounds);
+            node.corner_radii = node
+                .corner_radii
+                .map(|r| *r * transform.rotation_scale[0][0]);
+            parent = self.append(node);
+            remapped.insert(old, parent);
+        }
+        parent
+    }
+
     pub(crate) fn replay_with_cache(
         &mut self,
         old: ClipId,

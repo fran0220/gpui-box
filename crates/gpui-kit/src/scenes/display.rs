@@ -1160,6 +1160,8 @@ struct TemporalScene {
     domain: [f64; 2],
     collapsed: std::collections::HashSet<SharedString>,
     selected: SharedString,
+    time_selection: Option<[f64; 2]>,
+    accepts_time_selection: bool,
 }
 impl Global for TemporalScene {}
 
@@ -1170,6 +1172,8 @@ pub(super) fn trace_time(_window: &mut Window, cx: &mut App) -> AnyElement {
             domain: [1_700_000_000_200., 1_700_000_001_000.],
             collapsed: std::collections::HashSet::from(["request.birch".into()]),
             selected: "request.atlas.decode".into(),
+            time_selection: Some([1_700_000_000_420., 1_700_000_000_655.]),
+            accepts_time_selection: true,
         });
     }
     let state = cx.global::<TemporalScene>().clone();
@@ -1207,15 +1211,80 @@ pub(super) fn trace_time(_window: &mut Window, cx: &mut App) -> AnyElement {
     }
     let spans = std::rc::Rc::new(spans);
     stack(&theme).w(px(760.)).child(caption(&theme, "Fixture raw UTC milliseconds · Ctrl-wheel zoom · Shift-wheel pan · disclosure / arrow keys"))
-        .child(TraceView::new("scene.trace-time.tree", "144 spans · eight visible rows")
+        .child(div().row().gap_token(&theme, Space::Sm)
+            .child(Button::new("scene.trace-time.zoom-in").label("Zoom in").secondary().small()
+                .on_click(|_, cx| {
+                    cx.update_global::<TemporalScene, ()>(|s, _| {
+                        use crate::display::chart::scale::{NumericScale, ScaleKind};
+                        if let Ok(scale) = NumericScale::new(ScaleKind::Time, s.domain).and_then(|scale| scale.zoom(0.5, 1.5)) {
+                            s.domain = scale.domain();
+                        }
+                    }); cx.refresh_windows();
+                }))
+            .child(Button::new("scene.trace-time.later").label("Later").secondary().small()
+                .on_click(|_, cx| {
+                    cx.update_global::<TemporalScene, ()>(|s, _| {
+                        use crate::display::chart::scale::{NumericScale, ScaleKind};
+                        if let Ok(scale) = NumericScale::new(ScaleKind::Time, s.domain).and_then(|scale| scale.pan(0.2)) {
+                            s.domain = scale.domain();
+                        }
+                    }); cx.refresh_windows();
+                }))
+            .child(Button::new("scene.trace-time.reset").label("Reset window").secondary().small()
+                .on_click(|_, cx| {
+                    cx.update_global::<TemporalScene, ()>(|s, _| s.domain = [1_700_000_000_200., 1_700_000_001_000.]);
+                    cx.refresh_windows();
+                }))
+            .child(Button::new("scene.trace-time.clear-range").label("Clear range").secondary().small()
+                .on_click(|_,cx| {
+                    cx.update_global::<TemporalScene, ()>(|s,_| s.time_selection = None);
+                    cx.refresh_windows();
+                }))
+            .child(Button::new("scene.trace-time.zoom-range").label("Zoom to range").secondary().small()
+                .disabled(state.time_selection.is_none())
+                .on_click(|_,cx| {
+                    cx.update_global::<TemporalScene, ()>(|s,_| {
+                        use crate::display::chart::scale::{NumericScale,ScaleKind};
+                        if let Some(range) = s.time_selection && let Ok(scale) = NumericScale::new(ScaleKind::Time,range) {
+                            s.domain = scale.domain();
+                        }
+                    });
+                    cx.refresh_windows();
+                }))
+            .child(Button::new("scene.trace-time.accept-range").label(if state.accepts_time_selection {"Refuse edits"} else {"Accept edits"}).secondary().small()
+                .on_click(|_,cx| {
+                    cx.update_global::<TemporalScene, ()>(|s,_| s.accepts_time_selection = !s.accepts_time_selection);
+                    cx.refresh_windows();
+                })))
+        .child(TraceView::new("scene.trace-time.tree", "144 spans · eight-row viewport")
             .shared_spans(spans.clone()).time_viewport(state.domain).expect("valid time window")
+            .selected_time(state.time_selection).expect("valid selection")
+            .on_time_selection(|event,_,cx| {
+                use crate::interaction::range::RangeEvent;
+                cx.update_global::<TemporalScene, ()>(|s,_| {
+                    if s.accepts_time_selection && let RangeEvent::Update {value,..} | RangeEvent::Commit {value,..} = event {
+                        s.time_selection = Some(value);
+                    }
+                });
+                cx.refresh_windows();
+            })
             .format_time(|time| format!("{:.0} ms", time - 1_700_000_000_000.).into())
             .visible_rows(8).collapsed(state.collapsed.clone()).current(state.selected.clone())
             .on_viewport(|scale, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.domain = scale.domain()); cx.refresh_windows(); })
-            .on_toggle(|id, expanded, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| { if expanded { s.collapsed.remove(&id); } else { s.collapsed.insert(id); } }); cx.refresh_windows(); })
+            .on_toggle(|id, expanded, _, cx| {
+                cx.update_global::<TemporalScene, ()>(|s, _| {
+                    if expanded {
+                        s.collapsed.remove(&id);
+                    } else {
+                        s.collapsed.insert(id);
+                    }
+                });
+                cx.refresh_windows();
+            })
             .on_select(|id, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.selected = id); cx.refresh_windows(); }))
         .child(SpanTimeline::new("scene.trace-time.timeline", "Same caller-owned time window")
             .shared_spans(spans).time_viewport(state.domain).expect("valid time window")
+            .selected_time(state.time_selection).expect("valid selection")
             .format_time(|time| format!("{:.0} ms", time - 1_700_000_000_000.).into())
             .visible_rows(4).collapsed(state.collapsed).current(state.selected)
             .on_viewport(|scale, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.domain = scale.domain()); cx.refresh_windows(); }))

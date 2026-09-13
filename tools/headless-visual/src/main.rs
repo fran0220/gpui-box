@@ -60,6 +60,9 @@ fn main() -> Result<()> {
 
 mod serve;
 
+#[cfg(test)]
+mod paint_recording_tests;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Shard {
     index: usize,

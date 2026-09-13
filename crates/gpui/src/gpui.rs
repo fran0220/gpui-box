@@ -14,6 +14,7 @@ mod app;
 mod arena;
 mod asset_cache;
 mod assets;
+mod atlas_lease;
 mod bounds_tree;
 mod color;
 /// The default colors used by GPUI.
@@ -34,6 +35,7 @@ mod interactive;
 mod key_dispatch;
 mod keymap;
 mod luminance;
+mod paint_recording;
 mod particles;
 mod path_builder;
 mod platform;
@@ -131,6 +133,7 @@ macro_rules! bench_main {
         criterion::criterion_main!($($tokens)*);
     };
 }
+pub use atlas_lease::*;
 pub use gpui_shared_string::*;
 pub use gpui_util::arc_cow::ArcCow;
 pub use http_client;
@@ -140,6 +143,7 @@ pub use interactive::*;
 use key_dispatch::*;
 pub use keymap::*;
 pub use luminance::*;
+pub use paint_recording::*;
 pub use particles::*;
 pub use path_builder::*;
 pub use platform::*;

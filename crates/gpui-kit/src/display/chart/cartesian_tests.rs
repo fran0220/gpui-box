@@ -4,6 +4,191 @@ use gpui::{Modifiers, TestAppContext};
 use gpui_kit_testkit::harness::Harness;
 use std::cell::RefCell;
 
+#[gpui::test]
+fn removing_whole_chart_during_brush_cancels_without_adapter_precleanup(cx: &mut TestAppContext) {
+    use gpui::InputEvent;
+    use std::cell::Cell;
+    let shown = Rc::new(Cell::new(true));
+    let visible = shown.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let logging = events.clone();
+    let mut harness = Harness::new(cx, crate::install, move |_, _| {
+        if !visible.get() {
+            return div().into_any_element();
+        }
+        let scale = NumericScale::new(ScaleKind::Linear, [0., 100.]).expect("fixture domain");
+        let logging = logging.clone();
+        div()
+            .w(px(400.))
+            .child(
+                CartesianChart::new(
+                    "unmount",
+                    "Unmount fixture",
+                    ChartScale::Numeric(scale),
+                    [ValueAxis {
+                        id: "y".into(),
+                        label: "Units".into(),
+                        scale,
+                    }],
+                )
+                .series([RawSeries::new("reading", "y", SeriesMark::Scatter)
+                    .points([RawPoint::new("west", ChartValue::Number(23.), Some(61.))])])
+                .on_event(move |event, _, _| logging.borrow_mut().push(event)),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let at = harness.point_in("unmount.series.reading.point.west");
+    harness.update(|window, cx| {
+        window.dispatch_event(
+            gpui::MouseDownEvent {
+                position: at,
+                button: MouseButton::Left,
+                modifiers: Modifiers {
+                    shift: true,
+                    ..Modifiers::none()
+                },
+                click_count: 1,
+                first_mouse: false,
+            }
+            .to_platform_input(),
+            cx,
+        );
+        window.dispatch_event(
+            gpui::MouseMoveEvent {
+                position: point(at.x + px(73.), at.y),
+                pressed_button: Some(MouseButton::Left),
+                modifiers: Modifiers {
+                    shift: true,
+                    ..Modifiers::none()
+                },
+            }
+            .to_platform_input(),
+            cx,
+        );
+    });
+    harness.frame();
+    assert!(harness.node("unmount.brush-preview").is_some());
+    assert!(harness.update(|window, _| window.captured_hitbox().is_some()));
+    shown.set(false);
+    harness.frame();
+    assert!(!harness.update(|window, _| window.captured_hitbox().is_some()));
+    harness.update(|window, cx| {
+        window.dispatch_event(
+            gpui::MouseUpEvent {
+                position: at,
+                button: MouseButton::Left,
+                modifiers: Modifiers::none(),
+                click_count: 1,
+            }
+            .to_platform_input(),
+            cx,
+        );
+    });
+    assert!(!events.borrow().iter().any(|event| matches!(
+        event,
+        CartesianEvent::Brush(_) | CartesianEvent::Select(Some(_))
+    )));
+    shown.set(true);
+    harness.frame();
+    assert!(
+        harness.node("unmount.brush-preview").is_none(),
+        "remount must not resurrect a removed owner's draft"
+    );
+    harness.update(|window, _| window.remove_window());
+}
+
+#[gpui::test]
+fn successive_mounted_fixtures_remove_previous_windows_before_refreshing(cx: &mut TestAppContext) {
+    use std::cell::Cell;
+    let mut retired = Vec::<(Rc<Cell<usize>>, usize)>::new();
+    for items in [1_000, 10_000] {
+        let draws = Rc::new(Cell::new(0));
+        let drawing = draws.clone();
+        let scale = NumericScale::new(ScaleKind::Linear, [0., 24.]).expect("fixture viewport");
+        let series = Rc::new(vec![
+            RawSeries::new("observations", "y", SeriesMark::Scatter).points((0..items).map(
+                |reading| {
+                    RawPoint::new(
+                        format!("reading-{reading}"),
+                        ChartValue::Number(f64::from(reading)),
+                        Some(f64::from(reading % 19)),
+                    )
+                },
+            )),
+        ]);
+        let mut fixture = Harness::new(cx, crate::install, move |_, _| {
+            drawing.set(drawing.get() + 1);
+            div()
+                .w(px(360.))
+                .child(
+                    CartesianChart::new(
+                        "isolation",
+                        "Fixture isolation",
+                        ChartScale::Numeric(scale),
+                        [ValueAxis {
+                            id: "y".into(),
+                            label: "Units".into(),
+                            scale,
+                        }],
+                    )
+                    .shared_series(series.clone())
+                    .animate(false),
+                )
+                .into_any_element()
+        });
+        fixture.frame();
+        let before = draws.get();
+        fixture.frame();
+        assert!(draws.get() > before, "current fixture actually rendered");
+        for (counter, frozen) in &retired {
+            assert_eq!(
+                counter.get(),
+                *frozen,
+                "a previous dataset contaminated this refresh"
+            );
+        }
+        // Dropping Harness does not close its window. Explicit lifecycle is
+        // necessary before any later case refreshes this shared App context.
+        fixture.update(|window, _| window.remove_window());
+        retired.push((draws.clone(), draws.get()));
+    }
+}
+
+#[test]
+fn hit_cache_tracks_painted_revision_size_and_custom_mark_removal() {
+    let mut cache = HitCache::default();
+    let projection = Rc::new(Vec::new());
+    let hits = || {
+        vec![Hit {
+            series: 0,
+            point: 0,
+            x: 0.3,
+            y: 0.7,
+            rect: [0.2, 0.6, 0.4, 0.8],
+        }]
+    };
+    let first = cache.get(&projection, [300., 120.], false, hits);
+    let first_index = cache.index();
+    let same = cache.get(&projection, [300., 120.], false, || {
+        panic!("settled geometry should not rebuild")
+    });
+    assert!(Rc::ptr_eq(&first, &same));
+    assert!(Rc::ptr_eq(&first_index, &cache.index()));
+    let resized = cache.get(&projection, [120., 300.], false, hits);
+    assert!(!Rc::ptr_eq(&first, &resized));
+    assert!(!Rc::ptr_eq(&first_index, &cache.index()));
+    let custom = cache.get(&projection, [120., 300.], true, hits);
+    let standard = cache.get(&projection, [120., 300.], false, hits);
+    assert!(!Rc::ptr_eq(&custom, &standard));
+    let next = Rc::new(Vec::new());
+    assert!(!Rc::ptr_eq(
+        &standard,
+        &cache.get(&next, [120., 300.], false, hits)
+    ));
+}
+
 #[test]
 fn explicit_ticks_validate_raw_values_and_preserve_caller_labels() {
     let ticks = |values: &[f64]| {
@@ -64,6 +249,86 @@ fn explicit_ticks_validate_raw_values_and_preserve_caller_labels() {
             .axis_ticks("absent", []),
         Err(TickError::UnknownAxis)
     ));
+}
+
+#[gpui::test]
+fn rich_shared_tooltip_retains_exact_missing_rows_and_retires_hidden_anchor(
+    cx: &mut TestAppContext,
+) {
+    let captured = Rc::new(RefCell::new(None::<ChartTooltipData>));
+    let output = captured.clone();
+    let hidden = Rc::new(RefCell::new(false));
+    let input = hidden.clone();
+    let floating = Rc::new(RefCell::new(true));
+    let shown = floating.clone();
+    let mut harness = Harness::new(cx, crate::install, move |_, _| {
+        let output = output.clone();
+        let mut c = chart(NumericScale::new(ScaleKind::Linear, [0., 10.]).expect("fixture x"));
+        Rc::make_mut(&mut c.series).push(
+            RawSeries::new("unreported", "y", SeriesMark::Line).points([RawPoint::new(
+                "pending-west",
+                ChartValue::Number(3.),
+                None,
+            )
+            .text("West pending", "Awaiting verified reading")]),
+        );
+        div()
+            .w(px(300.))
+            .child(
+                c.tooltip(TooltipMode::SharedAxis)
+                    .selected(Some(ChartSelection::new("sales", "west")))
+                    .hidden(if *input.borrow() {
+                        vec!["sales"]
+                    } else {
+                        vec![]
+                    })
+                    .floating_tooltip(*shown.borrow())
+                    .tooltip_content(move |data, _, _| {
+                        *output.borrow_mut() = Some(data.clone());
+                        div()
+                            .w(px(700.))
+                            .child("Caller rich content with intentionally wide layout")
+                            .into_any_element()
+                    }),
+            )
+            .into_any_element()
+    });
+    let tooltip = harness
+        .node("test.chart.tooltip")
+        .expect("floating rich tooltip");
+    assert_eq!(tooltip.role, Role::Tooltip);
+    assert!(tooltip.bounds.width <= 360.);
+    let viewport = harness.update(|window, _| window.viewport_size());
+    assert!(
+        tooltip.bounds.x >= 0.
+            && tooltip.bounds.x + tooltip.bounds.width <= f32::from(viewport.width)
+    );
+    assert!(
+        tooltip.bounds.y >= 0.
+            && tooltip.bounds.y + tooltip.bounds.height <= f32::from(viewport.height)
+    );
+    let data = captured.borrow().clone().expect("caller tooltip data");
+    assert_eq!(data.rows.len(), 2);
+    assert_eq!(data.rows[0].point.y, Some(-5.));
+    assert_eq!(data.rows[1].point.id.as_ref(), "pending-west");
+    assert_eq!(data.rows[1].point.y, None);
+    *floating.borrow_mut() = false;
+    harness.frame();
+    assert!(harness.node("test.chart.tooltip").is_none());
+    assert!(
+        harness
+            .node("test.chart.readout")
+            .expect("retained readout")
+            .value
+            .as_deref()
+            .expect("current values")
+            .contains("Awaiting verified reading")
+    );
+    *hidden.borrow_mut() = true;
+    *floating.borrow_mut() = true;
+    harness.frame();
+    assert!(harness.node("test.chart.tooltip").is_none());
+    assert!(harness.node("test.chart.readout").is_none());
 }
 
 #[test]

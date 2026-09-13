@@ -2064,6 +2064,7 @@ impl RenderOnce for StackedBarChart {
 }
 
 type LegendToggle = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
+type LegendEmphasis = Rc<dyn Fn(Option<SharedString>, &mut Window, &mut App)>;
 
 /// A standalone legend that reports series hide and show.
 #[derive(IntoElement)]
@@ -2072,6 +2073,7 @@ pub struct ChartLegend {
     series: Vec<ChartSeries>,
     hidden: Vec<SharedString>,
     on_toggle: Option<LegendToggle>,
+    on_emphasis: Option<LegendEmphasis>,
 }
 
 impl std::fmt::Debug for ChartLegend {
@@ -2092,6 +2094,7 @@ impl ChartLegend {
             series: series.into_iter().collect(),
             hidden: Vec::new(),
             on_toggle: None,
+            on_emphasis: None,
         }
     }
 
@@ -2105,6 +2108,15 @@ impl ChartLegend {
         handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_toggle = Some(Rc::new(handler));
+        self
+    }
+    /// Report pointer entry/exit by source series identity. The caller decides
+    /// whether to emphasize a series; this does not toggle visibility.
+    pub fn on_emphasis(
+        mut self,
+        handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_emphasis = Some(Rc::new(handler));
         self
     }
 }
@@ -2157,6 +2169,12 @@ impl RenderOnce for ChartLegend {
                                 cx.stop_propagation();
                             }
                         });
+                }
+                if let Some(handler) = self.on_emphasis.clone() {
+                    let id = series.id.clone();
+                    row = row.on_hover(move |hovered, window, cx| {
+                        handler(hovered.then(|| id.clone()), window, cx)
+                    });
                 }
                 Some(
                     row.semantic_in(

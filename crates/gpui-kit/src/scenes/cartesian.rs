@@ -8,6 +8,112 @@ use crate::display::chart::cartesian::{
 use crate::display::chart::data::*;
 use crate::display::chart::scale::*;
 
+pub(super) fn cartesian_lifecycle(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::display::chart::cartesian::CartesianMotion;
+    use crate::motion::{CubicBezier, MotionSpec};
+    let theme = cx.theme().clone();
+    let state = crate::motion::keyed::slot::<u8>(
+        &"scene.lifecycle.state".into(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let flags = *state.borrow();
+    let emphasis = crate::motion::keyed::slot::<Option<SharedString>>(
+        &"scene.lifecycle.emphasis".into(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let emphasized = emphasis.borrow().clone();
+    let controls = [
+        ("update", "Update values / colors", 1),
+        ("hide", "Hide / show observed", 2),
+        ("remove", "Remove / restore west", 4),
+        ("reorder", "Reorder series", 8),
+        ("viewport", "Change viewport", 16),
+    ]
+    .into_iter()
+    .map(|(id, label, mask)| {
+        let state = state.clone();
+        Button::new(format!("scene.lifecycle.{id}"))
+            .label(label)
+            .secondary()
+            .on_click(move |window, _| {
+                *state.borrow_mut() ^= mask;
+                window.refresh();
+            })
+    })
+    .collect::<Vec<_>>();
+    let revised = flags & 1 != 0;
+    let observed = RawSeries::new("observed", "units", SeriesMark::Bar)
+        .tint(if revised {
+            gpui::hsla(0.82, 0.65, 0.52, 1.)
+        } else {
+            gpui::hsla(0.55, 0.75, 0.43, 1.)
+        })
+        .points(
+            [
+                ("west", 17., 23.),
+                ("central", 47., 73.),
+                ("east", 83., 41.),
+            ]
+            .into_iter()
+            .filter(|(id, _, _)| flags & 4 == 0 || *id != "west")
+            .map(|(id, x, y)| {
+                let value = if revised { 100. - y } else { y };
+                RawPoint::new(id, ChartValue::Number(x), Some(value))
+                    .text(id, format!("{value} observed"))
+            }),
+        );
+    let forecast = RawSeries::new("forecast", "units", SeriesMark::Bar)
+        .tint(gpui::hsla(0.08, 0.8, 0.55, 1.))
+        .points(
+            [
+                ("west", 17., 39.),
+                ("central", 47., 52.),
+                ("east", 83., 67.),
+            ]
+            .into_iter()
+            .map(|(id, x, y)| {
+                RawPoint::new(id, ChartValue::Number(x), Some(y)).text(id, format!("{y} forecast"))
+            }),
+        );
+    let mut series = vec![observed, forecast];
+    if flags & 8 != 0 {
+        series.reverse();
+    }
+    let linear = MotionSpec::new(800, CubicBezier::new(0., 0., 1., 1.));
+    let x = NumericScale::new(
+        ScaleKind::Linear,
+        if flags & 16 != 0 {
+            [0., 140.]
+        } else {
+            [0., 100.]
+        },
+    )
+    .expect("fixture x domain");
+    stack(&theme).w(px(920.))
+        .child(caption(&theme,"Original fixture · keyed geometry, color and presence; retired visuals never remain interactive. Playback uses 800ms linear transitions."))
+        .child(div().row().flex_wrap().gap_token(&theme,Space::Sm).children(controls))
+        .child(CartesianChart::new("scene.lifecycle.chart","Observed and forecast",ChartScale::Numeric(x),[
+            ValueAxis{id:"units".into(),label:"Units".into(),scale:NumericScale::new(ScaleKind::Linear,[0.,100.]).expect("fixture y domain")}])
+            .series(series).hidden([("observed",2),("forecast",32)].into_iter().filter(|(_,mask)|flags&mask!=0).map(|(id,_)|id))
+            .emphasized(emphasized)
+            .motion(CartesianMotion{enter:linear,update:linear,exit:linear}).height(300.)
+            .selected(Some(ChartSelection::new("observed","west")))
+            .on_event(move|event,window,_|{
+                match event {
+                    CartesianEvent::Emphasis(value)=>*emphasis.borrow_mut()=value,
+                    CartesianEvent::Visibility{series,visible}=>{
+                        let mask=if series=="observed"{2}else{32};
+                        if visible {*state.borrow_mut()&=!mask;}else{*state.borrow_mut()|=mask;}
+                    },
+                    _=>return,
+                }
+                window.refresh();
+            }))
+        .into_any_element()
+}
+
 pub(super) fn cartesian(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let scale =
@@ -342,13 +448,16 @@ pub(super) fn cartesian_states(_window: &mut Window, cx: &mut App) -> AnyElement
 /// The scene owns the linked state exactly as a product would; charts emit
 /// requests and never communicate through a chart-global synchronization bus.
 pub(super) fn cartesian_linked(window: &mut Window, cx: &mut App) -> AnyElement {
-    use crate::display::chart::cartesian::CartesianEvent;
+    use crate::display::chart::cartesian::{CartesianEvent, CartesianRange};
+    use crate::interaction::range::RangeEvent;
     #[derive(Default)]
     struct Linked {
         scale: Option<NumericScale>,
         selected: Option<ChartSelection>,
         hovered: Option<ChartSelection>,
         hidden: Vec<SharedString>,
+        range: Option<[f64; 2]>,
+        refuse: bool,
     }
     let theme = cx.theme().clone();
     let state = crate::motion::keyed::slot::<Linked>(
@@ -405,6 +514,11 @@ pub(super) fn cartesian_linked(window: &mut Window, cx: &mut App) -> AnyElement 
                 .selected(current.selected.clone())
                 .hovered(current.hovered.clone())
                 .hidden(current.hidden.clone())
+                .range(CartesianRange::new(
+                    initial,
+                    current.range,
+                    "Selected interval",
+                ))
                 .height(210.)
                 .format_ticks(|axis, v| {
                     if axis == "x" {
@@ -429,7 +543,18 @@ pub(super) fn cartesian_linked(window: &mut Window, cx: &mut App) -> AnyElement 
                             state.scale =
                                 NumericScale::new(ScaleKind::Time, [a.min(b), a.max(b)]).ok();
                         }
-                        CartesianEvent::Reset => state.scale = None,
+                        CartesianEvent::Range(
+                            RangeEvent::Update { value, .. } | RangeEvent::Commit { value, .. },
+                        ) if !state.refuse => {
+                            state.range = Some(value);
+                            if value[0] < value[1] {
+                                state.scale = NumericScale::new(ScaleKind::Time, value).ok();
+                            }
+                        }
+                        CartesianEvent::Reset => {
+                            state.scale = None;
+                            state.range = None;
+                        }
                         _ => {}
                     }
                     window.refresh();
@@ -437,8 +562,11 @@ pub(super) fn cartesian_linked(window: &mut Window, cx: &mut App) -> AnyElement 
             ),
         );
     }
+    let refused = current.refuse;
     drop(current);
+    let acceptance = state.clone();
     stack(&theme).w(px(920.)).child(caption(&theme,"Linked caller-owned time viewport · drag to pan, Shift-drag brush, wheel zoom; arrows select, Home resets"))
+        .child(Button::new("scene.linked.acceptance").label(if refused { "Host refuses range proposals" } else { "Host accepts range proposals" }).secondary().on_click(move |window, _| {let mut state = acceptance.borrow_mut(); state.refuse = !state.refuse; window.refresh();}))
         .child(div().row().items_start().gap_token(&theme,Space::Lg).children(charts)).into_any_element()
 }
 

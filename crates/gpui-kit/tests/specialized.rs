@@ -7,6 +7,213 @@ use gpui_kit_testkit::harness::Harness;
 use std::{cell::RefCell, rc::Rc};
 
 #[gpui::test]
+fn measured_labels_stay_disjoint_during_interrupted_layout(cx: &mut TestAppContext) {
+    let scene = gpui_kit::scenes::find("specialized-exploration").expect("dynamic exhibit");
+    let mut h = Harness::new(cx, gpui_kit::install, scene.build);
+    for _ in 0..4 {
+        h.click("scene.specialized.advance");
+        h.advance(std::time::Duration::from_millis(60));
+        let snapshot = h.snapshot();
+        for family in ["tree", "sun", "funnel"] {
+            let labels = snapshot.under(&format!("scene.specialized.live.{family}.plot.label."));
+            if family != "funnel" {
+                assert!(labels.len() >= 2, "hierarchy must expose measured labels");
+            }
+            for (index, a) in labels.iter().enumerate() {
+                for b in &labels[index + 1..] {
+                    let (a, b) = (a.bounds, b.bounds);
+                    assert!(
+                        a.x + a.width <= b.x
+                            || b.x + b.width <= a.x
+                            || a.y + a.height <= b.y
+                            || b.y + b.height <= a.y
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[gpui::test]
+fn exploration_exhibit_refuses_then_accepts_drill_back_and_removes_live_targets(
+    cx: &mut TestAppContext,
+) {
+    let scene = gpui_kit::scenes::find("specialized-exploration").expect("dynamic exhibit");
+    let mut h = Harness::new(cx, gpui_kit::install, scene.build);
+    h.advance(std::time::Duration::from_secs(2));
+    h.click("scene.specialized.refuse");
+    h.click("scene.specialized.live.tree.navigation.group");
+    assert!(
+        h.node("scene.specialized.live.tree.plot.mark.deliver")
+            .is_some()
+    );
+    h.click("scene.specialized.refuse");
+    h.click("scene.specialized.live.tree.navigation.group");
+    assert!(
+        h.node("scene.specialized.live.tree.plot.mark.deliver")
+            .is_none()
+    );
+    assert!(
+        h.node("scene.specialized.live.tree.navigation.group")
+            .expect("focus")
+            .disabled
+    );
+    h.click("scene.specialized.live.tree.navigation.total");
+    assert!(
+        h.node("scene.specialized.live.tree.plot.mark.deliver")
+            .is_some()
+    );
+    let initial = h
+        .node("scene.specialized.live.tree.plot.mark.parse")
+        .expect("initial shape")
+        .bounds;
+    h.click("scene.specialized.advance");
+    assert_eq!(
+        h.node("scene.specialized.live.tree.plot.mark.parse")
+            .expect("latest value")
+            .value
+            .as_deref(),
+        Some("47")
+    );
+    assert!(
+        h.node("scene.specialized.live.funnel.plot.mark.finish")
+            .is_none()
+    );
+    assert!(h.node("scene.specialized.live.funnel.key.finish").is_none());
+    h.advance(std::time::Duration::from_millis(60));
+    let intermediate = h
+        .node("scene.specialized.live.tree.plot.mark.parse")
+        .expect("moving shape")
+        .bounds;
+    assert_ne!(initial, intermediate);
+    h.click("scene.specialized.advance");
+    assert_eq!(
+        h.node("scene.specialized.live.funnel")
+            .expect("empty state")
+            .value
+            .as_deref(),
+        Some("empty")
+    );
+    assert!(
+        h.node("scene.specialized.live.funnel.plot.mark.start")
+            .is_none()
+    );
+    h.update(|_, cx| cx.set_reduce_motion(true));
+    h.advance(std::time::Duration::ZERO);
+    h.click("scene.specialized.advance");
+    assert_eq!(
+        h.node("scene.specialized.live.funnel.plot.mark.finish")
+            .expect("reinserted shape")
+            .value
+            .as_deref(),
+        Some("24")
+    );
+}
+
+#[gpui::test]
+fn heatmap_motion_publishes_exact_latest_readings_and_missing_without_waiting(
+    cx: &mut TestAppContext,
+) {
+    let scene = gpui_kit::scenes::find("continuous-heatmap-transition").expect("dynamic exhibit");
+    let mut h = Harness::new(cx, gpui_kit::install, scene.build);
+    h.click("scene.heat.advance");
+    assert_eq!(
+        h.node("scene.heat.live.cell.changing")
+            .expect("changed reading")
+            .value
+            .as_deref(),
+        Some("32")
+    );
+    h.advance(std::time::Duration::from_millis(40));
+    h.click("scene.heat.advance");
+    assert_eq!(
+        h.node("scene.heat.live.cell.changing")
+            .expect("missing reading")
+            .value
+            .as_deref(),
+        Some("Not observed")
+    );
+    assert_eq!(
+        h.node("scene.heat.live.cell.zero")
+            .expect("verified zero")
+            .value
+            .as_deref(),
+        Some("0")
+    );
+    h.update(|_, cx| cx.set_reduce_motion(true));
+    h.click("scene.heat.advance");
+    assert_eq!(
+        h.node("scene.heat.live.cell.changing")
+            .expect("settled reading")
+            .value
+            .as_deref(),
+        Some("-8")
+    );
+}
+
+#[gpui::test]
+fn geometric_pointer_proposals_do_not_accept_refused_selection(cx: &mut TestAppContext) {
+    use gpui_kit::display::specialized::HierarchyNode;
+    let reports = Rc::new(RefCell::new(Vec::<SharedString>::new()));
+    let sink = reports.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        SpecializedChart::new(
+            "sun",
+            "Hierarchy",
+            PlotState::Ready(
+                SpecializedData::sunburst(&HierarchyNode::branch(
+                    "root",
+                    "Root",
+                    vec![
+                        HierarchyNode::leaf(WeightedValue::new("small", "Small", 1.0)),
+                        HierarchyNode::leaf(WeightedValue::new("large", "Large", 3.0)),
+                    ],
+                ))
+                .expect("hierarchy"),
+            ),
+        )
+        .selected(None)
+        .on_current(move |id, _, _| sink.borrow_mut().push(id))
+        .into_any_element()
+    });
+    let frame = harness.node("sun.plot").expect("measured plot").bounds;
+    for (x, y, expected) in [
+        (0.5, 0.5, Some("root")),
+        (0.72, 0.22, Some("small")),
+        (0.99, 0.99, None),
+    ] {
+        reports.borrow_mut().clear();
+        let p = gpui::point(
+            px(frame.x + x * frame.width),
+            px(frame.y + y * frame.height),
+        );
+        harness
+            .context()
+            .simulate_mouse_down(p, gpui::MouseButton::Left, gpui::Modifiers::none());
+        harness
+            .context()
+            .simulate_mouse_up(p, gpui::MouseButton::Left, gpui::Modifiers::none());
+        harness.context().run_until_parked();
+        assert_eq!(reports.borrow().last().map(SharedString::as_ref), expected);
+        for id in ["root", "small", "large"] {
+            assert!(
+                !harness
+                    .node(&format!("sun.plot.mark.{id}"))
+                    .expect("mark")
+                    .selected
+            );
+        }
+    }
+    harness.click("sun.key.small");
+    assert_eq!(
+        reports.borrow().last().map(SharedString::as_ref),
+        Some("small")
+    );
+    assert!(!harness.node("sun.key.small").expect("key").selected);
+}
+
+#[gpui::test]
 fn specialized_selection_and_stale_values_agree(cx: &mut TestAppContext) {
     let reports = Rc::new(RefCell::new(Vec::<SharedString>::new()));
     let sink = reports.clone();

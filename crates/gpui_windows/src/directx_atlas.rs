@@ -23,6 +23,7 @@ struct DirectXAtlasState {
     polychrome_textures: AtlasTextureList<DirectXAtlasTexture>,
     subpixel_textures: AtlasTextureList<DirectXAtlasTexture>,
     tiles_by_key: FxHashMap<AtlasKey, AtlasTile>,
+    leases: gpui::AtlasLeaseRegistry,
 }
 
 struct DirectXAtlasTexture {
@@ -43,6 +44,7 @@ impl DirectXAtlas {
             polychrome_textures: Default::default(),
             subpixel_textures: Default::default(),
             tiles_by_key: Default::default(),
+            leases: Default::default(),
         }))
     }
 
@@ -61,6 +63,7 @@ impl DirectXAtlas {
         device_context: &ID3D11DeviceContext,
     ) {
         let mut lock = self.0.lock();
+        lock.leases.invalidate();
         lock.device = device.clone();
         lock.device_context = device_context.clone();
         lock.monochrome_textures = AtlasTextureList::default();
@@ -71,6 +74,22 @@ impl DirectXAtlas {
 }
 
 impl PlatformAtlas for DirectXAtlas {
+    fn resource_revision(&self) -> u64 {
+        self.0.lock().leases.revision()
+    }
+
+    fn retain_tiles(self: std::sync::Arc<Self>, tiles: &[AtlasTile]) -> Option<gpui::AtlasLease> {
+        let mut lock = self.0.lock();
+        let atlas = self.clone();
+        lock.leases.pin_tiles(tiles, move |epoch, keys| {
+            let mut lock = atlas.0.lock();
+            let removed = lock.leases.release(epoch, keys);
+            for key in removed {
+                lock.remove(&key);
+            }
+        })
+    }
+
     fn get_or_insert_with<'a>(
         &self,
         key: &AtlasKey,
@@ -91,16 +110,26 @@ impl PlatformAtlas for DirectXAtlas {
             let texture = lock.texture(tile.texture_id);
             texture.upload(&lock.device_context, tile.bounds, &bytes);
             lock.tiles_by_key.insert(key.clone(), tile);
+            lock.leases.insert_tile(key.clone(), tile);
             Ok(Some(tile))
         }
     }
 
     fn remove(&self, key: &AtlasKey) {
-        let mut lock = self.0.lock();
+        self.0.lock().remove(key);
+    }
+}
 
+impl DirectXAtlasState {
+    fn remove(&mut self, key: &AtlasKey) {
+        let lock = self;
+        if lock.leases.defer_remove(key) {
+            return;
+        }
         let Some(tile) = lock.tiles_by_key.remove(key) else {
             return;
         };
+        lock.leases.remove_tile(tile);
         let id = tile.texture_id;
 
         let textures = match id.kind {

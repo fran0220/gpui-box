@@ -1304,12 +1304,128 @@ fn node_group_publishes_its_boundary_selection_and_child_relationship(cx: &mut T
     assert!(group_bounds.bottom() >= child_bounds.bottom());
 }
 
-/// CPU test-platform work, separate from pure layout/routing workloads. The
-/// first unmeasured frame may mount all nodes; this is not a 100k editor claim.
+#[gpui::test]
+fn graph_culls_before_first_mount_and_uses_current_container_size(cx: &mut TestAppContext) {
+    let width = Rc::new(Cell::new(200.));
+    let far_mounts = Rc::new(Cell::new(0usize));
+    let current_width = Rc::clone(&width);
+    let mounts = Rc::clone(&far_mounts);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let mounts = Rc::clone(&mounts);
+        div()
+            .w(px(current_width.get()))
+            .h(px(240.))
+            .child(
+                NodeGraph::new("bounded")
+                    .placed(Placed::new(GraphNode::new("near", "Near"), 20., 20.).height(100.))
+                    .placed(
+                        Placed::new(
+                            GraphNode::new("far", "Far").child(gpui::container_query(
+                                move |_, _, _| {
+                                    mounts.set(mounts.get() + 1);
+                                    div().h(px(20.))
+                                },
+                            )),
+                            1000.,
+                            20.,
+                        )
+                        .height(100.),
+                    ),
+            )
+            .into_any_element()
+    });
+    assert!(harness.node("near").is_some());
+    assert!(harness.node("far").is_none());
+    assert_eq!(far_mounts.get(), 0, "offscreen content never mounted");
+    width.set(1300.);
+    harness.frame();
+    assert!(harness.node("far").is_some(), "resize applies this frame");
+    assert!(far_mounts.get() > 0);
+    width.set(200.);
+    harness.frame();
+    assert!(harness.node("far").is_none(), "shrunk targets are removed");
+}
+
+/// CPU test-platform work, separate from pure layout/routing workloads.
+/// Explicit dimensions, edgeless or row-chain topology, no fit. The chain
+/// cases are sparse, not evidence for dense 100k editor support.
+#[gpui::test]
+#[ignore = "explicit source mount/redraw/update evidence"]
+fn graph_source_workload(cx: &mut TestAppContext) {
+    for count in [1_000usize, 10_000, 100_000] {
+        for connected in [false, true] {
+            let placed = |i: usize, offset| {
+                Placed::new(
+                    GraphNode::new(format!("source.{i}"), "Fixture").width(120.),
+                    (i % 20) as f32 * 200. + offset,
+                    (i / 20) as f32 * 150.,
+                )
+                .height(80.)
+            };
+            let prepare = std::time::Instant::now();
+            let source = GraphSource::new(
+                (0..count).map(|i| placed(i, 0.)),
+                (0..count)
+                    .filter(|i| connected && i % 20 != 0)
+                    .map(|i| GraphEdge::new(format!("source.{}", i - 1), format!("source.{i}"))),
+            )
+            .expect("source");
+            let prepared = prepare.elapsed();
+            let shown = source.clone();
+            let start = std::time::Instant::now();
+            let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+                div()
+                    .w(px(640.))
+                    .h(px(360.))
+                    .child(
+                        NodeGraph::new("source-workload")
+                            .source(shown.clone())
+                            .animate_layout(false)
+                            .grid(false)
+                            .axes(false)
+                            .ground_light(false),
+                    )
+                    .into_any_element()
+            });
+            let mount = start.elapsed();
+            harness.frame();
+            let start = std::time::Instant::now();
+            harness.frame();
+            let redraw = start.elapsed();
+            let start = std::time::Instant::now();
+            source.upsert(placed(1, 23.)).expect("accepted node update");
+            harness.frame();
+            let update = start.elapsed();
+            let stats = harness.frame_stats();
+            assert!(stats.paint_calls < 2000);
+            let bounds = harness.bounds("source.1").expect("updated visible node");
+            let first = harness.bounds("source.0").expect("first visible node");
+            assert!((f32::from(bounds.origin.x - first.origin.x) - 223.).abs() < 0.01);
+            eprintln!(
+                "source nodes={count} connected={connected} prepare={prepared:?} mount={mount:?} unchanged={redraw:?} one_node_update={update:?} paint_calls={}; CPU test platform, no GPU/FPS claim",
+                stats.paint_calls
+            );
+            harness.update(|window, _| window.remove_window());
+        }
+    }
+}
+
 #[gpui::test]
 #[ignore = "explicit graph mount/redraw evidence"]
 fn graph_mount_workload(cx: &mut TestAppContext) {
-    for count in [1_000usize, 10_000] {
+    for (count, connected) in [
+        (1_000usize, false),
+        (10_000, false),
+        (100_000, false),
+        (1_000, true),
+        (10_000, true),
+        (100_000, true),
+    ] {
+        let edges = if connected {
+            count - count.div_ceil(20)
+        } else {
+            0
+        };
         let begin = std::time::Instant::now();
         let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
             let mut graph = NodeGraph::new("workload")
@@ -1325,6 +1441,12 @@ fn graph_mount_workload(cx: &mut TestAppContext) {
                     )
                     .height(80.),
                 );
+                if connected && i % 20 != 0 {
+                    graph = graph.edge(GraphEdge::new(
+                        format!("node.{}", i - 1),
+                        format!("node.{i}"),
+                    ));
+                }
             }
             div()
                 .w(px(640.))
@@ -1339,12 +1461,468 @@ fn graph_mount_workload(cx: &mut TestAppContext) {
         let redraw = begin.elapsed();
         let stats = harness.frame_stats();
         eprintln!(
-            "graph nodes={count} edges=0 test_platform_mount={mount:?} static_redraw={redraw:?} paint_calls={} prepaint_calls={}; includes builder/geometry scan; GPU submission not measured",
+            "graph nodes={count} edges={edges} test_platform_mount={mount:?} static_redraw={redraw:?} paint_calls={} prepaint_calls={}; includes builder/geometry scan; GPU submission not measured",
             stats.paint_calls, stats.prepaint_calls
         );
         assert!(
             stats.paint_calls < 2000,
             "settled viewport work must be culled"
         );
+        // Harness::frame refreshes every open window. Drop alone leaves the
+        // application window alive, contaminating the next dataset's timing.
+        harness.update(|window, _| window.remove_window());
     }
+}
+
+#[gpui::test]
+fn recorded_graph_card_keeps_paint_without_replaying_live_content(cx: &mut TestAppContext) {
+    let live = Rc::new(Cell::new(true));
+    let builds = Rc::new(Cell::new(0));
+    let clicks = Rc::new(Cell::new(0));
+    let replays = Rc::new(Cell::new(0));
+    let replayed = replays.clone();
+    let recording = Rc::new(RefCell::new(None::<gpui::PaintRecording>));
+    let capture_error = Rc::new(RefCell::new(None));
+    let (present, built, clicked, saved, errors) = (
+        live.clone(),
+        builds.clone(),
+        clicks.clone(),
+        recording.clone(),
+        capture_error.clone(),
+    );
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let live = present.get();
+        let built = built.clone();
+        let clicked = clicked.clone();
+        let saved = saved.clone();
+        let errors = errors.clone();
+        let replayed = replayed.clone();
+        div()
+            .w(px(420.))
+            .h(px(300.))
+            .overflow_hidden()
+            .child(
+                gpui::canvas(
+                    move |bounds, window, cx| {
+                        if !live {
+                            return None;
+                        }
+                        built.set(built.get() + 1);
+                        let mut child = GraphNode::new("recorded-node", "Caller card")
+                            .child(
+                                div()
+                                    .id("recorded-action")
+                                    .w(px(90.))
+                                    .h(px(27.))
+                                    .child("Inspect")
+                                    .on_click(move |_, _, _| clicked.set(clicked.get() + 1))
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new("recorded-action", Role::Button),
+                                    ),
+                            )
+                            .into_any_element();
+                        child.prepaint_as_root(
+                            bounds.origin,
+                            bounds.size.map(gpui::AvailableSpace::Definite),
+                            window,
+                            cx,
+                        );
+                        Some(child)
+                    },
+                    move |bounds, child, window, cx| {
+                        window.paint_layer(bounds, |window| {
+                            if let Some(mut child) = child {
+                                let mark = window.paint_mark();
+                                child.paint(window, cx);
+                                match window.record_paint_since(mark) {
+                                    Ok(recording) => {
+                                        *saved.borrow_mut() = Some(recording);
+                                    }
+                                    Err(error) => {
+                                        saved.borrow_mut().take();
+                                        *errors.borrow_mut() = Some(error);
+                                    }
+                                }
+                            } else if let Some(recording) = saved.borrow().as_ref() {
+                                window
+                                    .paint_recording_with_offset(recording, point(px(19.), px(7.)))
+                                    .expect("compatible graph replay");
+                                replayed.set(replayed.get() + 1);
+                            }
+                        });
+                    },
+                )
+                .size_full(),
+            )
+            .into_any_element()
+    });
+    assert_eq!(*capture_error.borrow(), None);
+    assert!(
+        recording.borrow().is_some(),
+        "ordinary GraphNode must be recordable"
+    );
+    let button = harness
+        .bounds("recorded-action")
+        .expect("live caller action")
+        .center();
+    harness.click("recorded-action");
+    assert_eq!(clicks.get(), 1);
+    assert_eq!(*capture_error.borrow(), None);
+    assert!(recording.borrow().is_some());
+    live.set(false);
+    harness.frame();
+    assert!(replays.get() > 0, "retired frame must replay a recording");
+    let retired_builds = builds.get();
+    assert!(harness.node("recorded-action").is_none());
+    assert!(harness.node("recorded-node").is_none());
+    harness
+        .context()
+        .simulate_mouse_down(button, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(button, MouseButton::Left, Modifiers::none());
+    harness.frame();
+    assert_eq!(clicks.get(), 1, "frozen content has no live action");
+    assert_eq!(
+        builds.get(),
+        retired_builds,
+        "retirement never rebuilds opaque content"
+    );
+    recording.borrow_mut().take();
+    harness.frame();
+    assert!(harness.node("recorded-action").is_none());
+}
+
+#[gpui::test]
+fn graph_source_mounts_only_visible_factories_and_publishes_updates_and_removal(
+    cx: &mut TestAppContext,
+) {
+    let source = GraphSource::new(
+        (0..10_000).map(|i| {
+            Placed::new(
+                GraphNode::new(format!("source.{i}"), "Canonical")
+                    .width(151.)
+                    .port(GraphPort::input("in", "Input")),
+                i as f32 * 400.,
+                23.,
+            )
+            .height(137.)
+        }),
+        [GraphEdge::new("source.0", "source.1").id("source.wire")],
+    )
+    .expect("finite source");
+    let built = Rc::new(RefCell::new(
+        std::collections::HashMap::<usize, usize>::new(),
+    ));
+    for i in 0..10_000 {
+        let built = built.clone();
+        source
+            .set_content(&format!("source.{i}"), move |_, cx| {
+                *built.borrow_mut().entry(i).or_default() += 1;
+                div()
+                    .child(format!("Body {i}"))
+                    .semantic_in(cx, NodeSpec::new(format!("source.body.{i}"), Role::Group))
+                    .into_any_element()
+            })
+            .expect("known identity");
+    }
+    let shown = source.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let log = events.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let log = log.clone();
+        div()
+            .w(px(600.))
+            .h(px(280.))
+            .child(
+                NodeGraph::new("source.graph")
+                    .source(shown.clone())
+                    .animate_layout(false)
+                    .fit(GraphFit::Whole(7))
+                    .interaction(GraphInteraction::Edit)
+                    .on_event(move |event, _, _| log.borrow_mut().push(event.clone())),
+            )
+            .into_any_element()
+    });
+    assert!(built.borrow().contains_key(&0));
+    assert!(
+        built.borrow().len() <= 3,
+        "offscreen factories must not run"
+    );
+    assert!(!built.borrow().contains_key(&9999));
+    assert!(events.borrow().iter().any(|event| matches!(event, NodeGraphEvent::ViewportChanged(viewport) if viewport.offset.x < -900_000.)), "Fit includes unmounted source geometry");
+    assert!(harness.node(&port_id("source.0", "in")).is_some());
+    assert!(
+        harness.node(&port_id("source.9999", "in")).is_none(),
+        "offscreen port controls must not mount"
+    );
+    assert_eq!(
+        harness
+            .node("source.0")
+            .expect("canonical node")
+            .text
+            .as_deref(),
+        Some("Canonical")
+    );
+    source
+        .upsert(
+            Placed::new(
+                GraphNode::new("source.0", "Revised")
+                    .width(193.)
+                    .state(NodeState::Failed),
+                37.,
+                61.,
+            )
+            .height(173.),
+        )
+        .expect("metadata replacement");
+    harness.frame();
+    let bounds = harness.bounds("source.0").expect("updated node");
+    assert_eq!(
+        (
+            f32::from(bounds.origin.x),
+            f32::from(bounds.origin.y),
+            f32::from(bounds.size.width),
+            f32::from(bounds.size.height)
+        ),
+        (37., 61., 193., 173.)
+    );
+    assert_eq!(
+        harness
+            .node("source.0")
+            .expect("updated node")
+            .text
+            .as_deref(),
+        Some("Revised")
+    );
+    assert_eq!(
+        harness
+            .node("source.0")
+            .expect("updated state")
+            .value
+            .as_deref(),
+        Some("failed")
+    );
+    assert!(
+        harness.node("source.body.0").is_some(),
+        "upsert preserves lazy factory"
+    );
+    harness.drag_start("source.0");
+    events.borrow_mut().clear();
+    assert!(source.remove("source.0"));
+    harness.frame();
+    assert!(harness.node("source.0").is_none());
+    assert!(harness.node("source.body.0").is_none());
+    assert!(harness.update(|window, _| window.captured_hitbox().is_none()));
+    harness.drop_here();
+    assert!(
+        events.borrow().is_empty(),
+        "removed source cannot finish a stale gesture"
+    );
+    source
+        .upsert(
+            Placed::new(
+                GraphNode::new("source.0", "Reinserted").width(113.),
+                11.,
+                17.,
+            )
+            .height(89.),
+        )
+        .expect("new incarnation");
+    harness.frame();
+    assert_eq!(
+        harness
+            .node("source.0")
+            .expect("reinserted")
+            .text
+            .as_deref(),
+        Some("Reinserted")
+    );
+    assert!(
+        harness.node("source.body.0").is_none(),
+        "removed factory never resurrects"
+    );
+}
+
+#[gpui::test]
+fn source_layout_retargets_displayed_cards_and_ports_but_not_caller_content(
+    cx: &mut TestAppContext,
+) {
+    fn card(title: &'static str, x: f32, y: f32, w: f32, h: f32) -> Placed {
+        Placed::new(
+            GraphNode::new("moving-card", title)
+                .width(w)
+                .port(GraphPort::output("out", "Output").side(PortSide::Right)),
+            x,
+            y,
+        )
+        .height(h)
+    }
+    let source = GraphSource::new([card("First", 40., 50., 180., 130.)], []).expect("source");
+    let shown = source.clone();
+    let accept = Rc::new(Cell::new(true));
+    let accepted = accept.clone();
+    let moves = Rc::new(Cell::new(0));
+    let moved = moves.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let source = shown.clone();
+        let accepted = accepted.clone();
+        let moved = moved.clone();
+        div()
+            .w(px(700.))
+            .h(px(500.))
+            .child(
+                NodeGraph::new("moving-graph")
+                    .source(shown.clone())
+                    .interaction(GraphInteraction::Arrange)
+                    .on_event(move |event, window, _| {
+                        if let NodeGraphEvent::NodeMoved { position, .. } = event {
+                            moved.set(moved.get() + 1);
+                            if accepted.get() {
+                                source
+                                    .upsert(card(
+                                        "Drag accepted",
+                                        position.x,
+                                        position.y,
+                                        210.,
+                                        150.,
+                                    ))
+                                    .expect("accepted position");
+                            }
+                            window.refresh();
+                        }
+                    }),
+            )
+            .into_any_element()
+    });
+    harness.update(|_, cx| cx.set_reduce_motion(false));
+    let original = harness.bounds("moving-card").expect("first card");
+    source
+        .upsert(card("Current target", 310., 90., 270., 190.))
+        .expect("new target");
+    harness.frame();
+    assert_eq!(harness.bounds("moving-card"), Some(original));
+    assert_eq!(
+        harness
+            .node("moving-card")
+            .expect("current content")
+            .text
+            .as_deref(),
+        Some("Current target")
+    );
+    harness.advance(std::time::Duration::from_millis(80));
+    let middle = harness.bounds("moving-card").expect("intermediate card");
+    assert!(middle.left() > original.left() && middle.left() < px(310.));
+    assert!(middle.size.width > original.size.width && middle.size.width < px(270.));
+    let socket = harness
+        .bounds(&port_id("moving-card", "out"))
+        .expect("displayed port");
+    assert!((f32::from(socket.center().x - middle.right())).abs() < 0.1);
+    source
+        .upsert(card("Retargeted now", 130., 240., 210., 150.))
+        .expect("retarget");
+    harness.frame();
+    assert_eq!(harness.bounds("moving-card"), Some(middle));
+    assert_eq!(
+        harness
+            .node("moving-card")
+            .expect("retarget content")
+            .text
+            .as_deref(),
+        Some("Retargeted now")
+    );
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+    harness.frame();
+    let settled = harness
+        .bounds("moving-card")
+        .expect("reduced motion target");
+    assert_eq!(settled.origin, point(px(130.), px(240.)));
+    assert_eq!(settled.size, gpui::size(px(210.), px(150.)));
+    harness.update(|_, cx| cx.set_reduce_motion(false));
+    harness.drag_start("moving-card");
+    harness.drag_to(settled.center() + point(px(37.), px(-19.)));
+    harness.frame();
+    let dragged = harness
+        .bounds("moving-card")
+        .expect("accepted direct position");
+    assert_eq!(dragged.origin, settled.origin + point(px(37.), px(-19.)));
+    harness.drop_here();
+    assert!(moves.get() > 0, "real captured moves reached the caller");
+    let dragged = harness
+        .bounds("moving-card")
+        .expect("released caller position");
+    let port_before_refusal = harness
+        .bounds(&port_id("moving-card", "out"))
+        .expect("resting socket");
+    let press_offset = harness.update(|_, cx| cx.theme().motion.press_offset);
+    accept.set(false);
+    let count = moves.get();
+    harness.drag_start("moving-card");
+    harness.drag_to(dragged.center() + point(px(-67.), px(43.)));
+    harness.frame();
+    assert!(moves.get() > count, "refused proposal reached the caller");
+    // The socket follows its measured row through existing pressed feedback,
+    // not the refused 67px/43px caller proposal.
+    assert_eq!(
+        harness
+            .bounds(&port_id("moving-card", "out"))
+            .expect("pressed socket")
+            .origin,
+        port_before_refusal.origin + point(px(0.), px(press_offset))
+    );
+    harness.drop_here();
+    harness.advance(std::time::Duration::from_secs(1));
+    assert_eq!(harness.bounds("moving-card"), Some(dragged));
+}
+
+#[gpui::test]
+fn lane_transition_semantic_target_retargets_then_disabled_motion_settles(cx: &mut TestAppContext) {
+    let lane = Rc::new(Cell::new(1));
+    let shown = lane.clone();
+    let animate = Rc::new(Cell::new(true));
+    let animates = animate.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(700.))
+            .h(px(450.))
+            .child(
+                NodeGraph::new("lane-graph")
+                    .animate_layout(animates.get())
+                    .placed(
+                        Placed::new(GraphNode::new("a", "Source").width(100.), 40., 100.)
+                            .height(80.),
+                    )
+                    .placed(
+                        Placed::new(GraphNode::new("b", "Destination").width(100.), 500., 100.)
+                            .height(80.),
+                    )
+                    .edge(GraphEdge::new("a", "b").id("lane").lane(shown.get())),
+            )
+            .into_any_element()
+    });
+    harness.update(|_, cx| cx.set_reduce_motion(false));
+    harness.frame();
+    let original = harness.bounds(&edge_id("lane")).expect("initial wire");
+    lane.set(5);
+    harness.frame();
+    assert_eq!(harness.bounds(&edge_id("lane")), Some(original));
+    harness.advance(std::time::Duration::from_millis(80));
+    let middle = harness.bounds(&edge_id("lane")).expect("displayed wire");
+    assert_ne!(middle, original);
+    lane.set(3);
+    harness.frame();
+    assert_eq!(harness.bounds(&edge_id("lane")), Some(middle));
+    animate.set(false);
+    harness.frame();
+    let settled = harness.bounds(&edge_id("lane")).expect("settled target");
+    assert_ne!(settled, middle);
+    animate.set(true);
+    harness.frame();
+    assert_eq!(harness.bounds(&edge_id("lane")), Some(settled));
+    lane.set(1);
+    harness.frame();
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+    harness.frame();
+    assert_eq!(harness.bounds(&edge_id("lane")), Some(original));
 }

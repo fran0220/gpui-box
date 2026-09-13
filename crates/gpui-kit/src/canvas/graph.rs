@@ -8,7 +8,7 @@
 //! stacking of edges beneath nodes, and the five states a canvas can be in.
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     rc::Rc,
 };
@@ -43,6 +43,8 @@ use super::edge::{
 };
 use super::minimap::{MinimapView, bounded_view};
 use super::node::{GraphNode, GraphPort, PortDirection, PortType, port_measure_id};
+use super::router::{RouteStatus, Router};
+use super::source::{GraphSource, NodeItems};
 use super::toolbar::CanvasToolbar;
 use super::{PORT_MARK_SCALE, composite_id};
 
@@ -221,7 +223,7 @@ struct GestureState {
     ///
     /// Empty on the first frame, which is deliberate: a canvas opening onto a
     /// graph draws it, and does not animate in every connection at once.
-    arrived: HashMap<SharedString, Instant>,
+    arrived: HashMap<SharedString, Option<Instant>>,
     /// Whether the first frame has been drawn, which is what makes the
     /// distinction above possible.
     opened: bool,
@@ -240,12 +242,28 @@ struct GestureState {
     /// Recording what was proposed is how the two are told apart exactly,
     /// rather than by guessing from how far the viewport moved.
     direct: Option<GraphViewport>,
+    direct_positions: HashMap<SharedString, Point<f32>>,
+    direct_sizes: HashMap<SharedString, Size<f32>>,
 }
 
 #[derive(Debug, Default)]
 struct EdgeIdentityCache {
     signature: Option<u64>,
     ids: HashSet<SharedString>,
+}
+
+fn edge_arrival(born: &mut Option<Instant>, now: Instant, span: f32, settle: bool) -> f32 {
+    let reveal = if settle {
+        1.0
+    } else {
+        born.map_or(1.0, |born| {
+            (now.saturating_duration_since(born).as_secs_f32() / span).clamp(0.0, 1.0)
+        })
+    };
+    if reveal >= 1.0 {
+        *born = None;
+    }
+    reveal
 }
 
 impl EdgeIdentityCache {
@@ -260,30 +278,16 @@ impl EdgeIdentityCache {
 
 #[derive(Debug, Default)]
 struct InteractionNodeCache {
-    signature: Option<u64>,
     nodes: Rc<Vec<(SharedString, Bounds<f32>)>>,
 }
 
 impl InteractionNodeCache {
     fn update(
         &mut self,
-        nodes: &[Placed],
-        theme: &gpui_kit_theme::Theme,
+        nodes: impl Iterator<Item = (SharedString, Bounds<f32>)> + Clone,
     ) -> Rc<Vec<(SharedString, Bounds<f32>)>> {
-        let signature = interaction_node_signature(nodes, theme);
-        if self.signature != Some(signature) {
-            self.nodes = Rc::new(
-                nodes
-                    .iter()
-                    .map(|placed| {
-                        (
-                            placed.node.ident().semantic_id(),
-                            placed.bounds(theme, None),
-                        )
-                    })
-                    .collect(),
-            );
-            self.signature = Some(signature);
+        if !self.nodes.iter().cloned().eq(nodes.clone()) {
+            self.nodes = Rc::new(nodes.collect());
         }
         Rc::clone(&self.nodes)
     }
@@ -939,14 +943,12 @@ fn place_relationship_labels(
     sizes: &HashMap<SharedString, Size<f32>>,
     visible_surface: Option<Bounds<f32>>,
     disconnect_controls: bool,
+    reserved: &[Bounds<f32>],
 ) -> HashMap<SharedString, RelationshipLabelPlacement> {
     let mut placed = HashMap::new();
-    let mut occupied = Vec::new();
+    let mut occupied = reserved.to_vec();
     for routed in routes {
         let id = routed.edge.edge_id();
-        if routed.edge.edge_label().is_none() {
-            continue;
-        }
         let Some(label_size) = sizes.get(&id).copied() else {
             continue;
         };
@@ -961,9 +963,33 @@ fn place_relationship_labels(
         };
         let gap = RELATIONSHIP_LABEL_GAP + if disconnect_controls { 9.0 } else { 0.0 };
         let mut best: Option<(RelationshipLabelPlacement, RelationshipLabelScore)> = None;
-        for (progress_rank, progress) in RELATIONSHIP_LABEL_PROGRESS.into_iter().enumerate() {
-            let at = routed.route.sample(progress);
-            let axis = routed.route.axis_at(progress);
+        let original_seats = RELATIONSHIP_LABEL_PROGRESS.into_iter().map(|progress| {
+            (
+                routed.route.sample(progress),
+                routed.route.axis_at(progress),
+            )
+        });
+        // A distant endpoint must not pin every label to the viewport edge.
+        // Sample the actual visible runs, not a line joining disconnected runs.
+        let visible_seats = visible_surface
+            .filter(|surface| !surface.contains(&routed.route.midpoint()))
+            .into_iter()
+            .flat_map(|surface| routed.route.clipped_segments(surface, 0.))
+            .flat_map(|[a, b]| {
+                RELATIONSHIP_LABEL_PROGRESS
+                    .into_iter()
+                    .chain([0., 1.])
+                    .map(move |progress| {
+                        let delta = b - a;
+                        let axis = if delta.x.abs() >= delta.y.abs() {
+                            Axis::Horizontal
+                        } else {
+                            Axis::Vertical
+                        };
+                        (a + delta * progress, axis)
+                    })
+            });
+        for (progress_rank, (at, axis)) in original_seats.chain(visible_seats).enumerate() {
             let preferred_positive = match axis {
                 Axis::Horizontal => at.y > relation_center.y,
                 Axis::Vertical => at.x > relation_center.x,
@@ -1141,21 +1167,6 @@ fn edge_identity_signature(edges: &[GraphEdge]) -> u64 {
     hasher.finish()
 }
 
-fn interaction_node_signature(nodes: &[Placed], theme: &gpui_kit_theme::Theme) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    nodes.len().hash(&mut hasher);
-    for placed in nodes {
-        placed.node.ident().semantic_id().hash(&mut hasher);
-        let bounds = placed.bounds(theme, None);
-        f32::to_bits(bounds.origin.x).hash(&mut hasher);
-        f32::to_bits(bounds.origin.y).hash(&mut hasher);
-        f32::to_bits(bounds.size.width).hash(&mut hasher);
-        f32::to_bits(bounds.size.height).hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
 fn viewport_value(state: &str, viewport: GraphViewport) -> String {
     format!(
         "state:{state};offset:{:.3},{:.3};zoom:{:.3}",
@@ -1262,10 +1273,123 @@ struct NodeGeometry {
     tint: Hsla,
     ports: Vec<PortGeometry>,
 }
+
+/// Canonical explicit-size source geometry, separate from displayed animation
+/// and previous-frame port-row measurements. A source edit recomputes only
+/// changed nodes; immutable snapshots already held by input/cache readers stay valid.
+#[derive(Default)]
+struct SourceGeometry {
+    source: Option<std::rc::Weak<RefCell<super::source::SourceData>>>,
+    revision: Option<u64>,
+    theme: Option<gpui_kit_theme::Theme>,
+    rows: HashMap<SharedString, f32>,
+    entries: HashMap<SharedString, ((u64, u64), NodeGeometry)>,
+    geometry: Rc<Vec<NodeGeometry>>,
+    #[cfg(test)]
+    builds: usize,
+}
+
+#[derive(Default)]
+struct NodeIndex {
+    geometry: Rc<Vec<NodeGeometry>>,
+    index: super::spatial::BoundsIndex,
+}
+
+impl NodeIndex {
+    fn update(&mut self, geometry: &Rc<Vec<NodeGeometry>>) {
+        if !Rc::ptr_eq(&self.geometry, geometry) {
+            self.index.update(geometry.iter().map(|node| node.bounds));
+            self.geometry = geometry.clone();
+        }
+    }
+}
+
+impl SourceGeometry {
+    fn resolve(
+        &mut self,
+        source: &GraphSource,
+        theme: &gpui_kit_theme::Theme,
+        rows: &HashMap<SharedString, f32>,
+    ) -> Rc<Vec<NodeGeometry>> {
+        let same = self
+            .source
+            .as_ref()
+            .is_some_and(|previous| previous.ptr_eq(&Rc::downgrade(&source.data)));
+        let theme_same = self
+            .theme
+            .as_ref()
+            .is_some_and(|previous| std::ptr::eq(&**previous, &**theme));
+        let revision = source.revision();
+        if same && theme_same && self.revision == Some(revision) && self.rows == *rows {
+            return self.geometry.clone();
+        }
+        if !same {
+            self.entries.clear();
+        }
+        let data = source.data.borrow();
+        let items = NodeItems::Source(&data);
+        self.entries
+            .retain(|id, _| data.node_revision(id).is_some());
+        let empty_heights = HashMap::new();
+        let mut changed = !same || self.geometry.len() != items.len();
+        for placed in items.iter() {
+            let id = placed.node.ident().semantic_id();
+            let Some(stamp) = data.node_revision(&id) else {
+                unreachable!()
+            };
+            let unchanged = theme_same
+                && self.entries.get(&id).is_some_and(|(old, _)| *old == stamp)
+                && placed.node.graph_ports().iter().all(|port| {
+                    let key = port_measure_id(&id, port.id());
+                    self.rows.get(&key) == rows.get(&key)
+                });
+            if !unchanged {
+                let Some(geometry) =
+                    NodeGraph::geometry_nodes(std::iter::once(placed), theme, &empty_heights, rows)
+                        .pop()
+                else {
+                    unreachable!()
+                };
+                changed |= self
+                    .entries
+                    .get(&id)
+                    .is_none_or(|(_, old)| old != &geometry);
+                self.entries.insert(id, (stamp, geometry));
+                #[cfg(test)]
+                {
+                    self.builds += 1;
+                }
+            }
+        }
+        // Equal cardinality remove/reinsert may change painter order while all
+        // surviving geometry remains equal.
+        changed |= items
+            .iter()
+            .zip(self.geometry.iter())
+            .any(|(placed, old)| placed.node.ident().semantic_id() != old.id);
+        if changed {
+            self.geometry = Rc::new(
+                items
+                    .iter()
+                    .map(|placed| self.entries[&placed.node.ident().semantic_id()].1.clone())
+                    .collect(),
+            );
+        }
+        self.source = Some(Rc::downgrade(&source.data));
+        self.revision = Some(revision);
+        self.theme = Some(theme.clone());
+        if self.rows != *rows {
+            self.rows.clone_from(rows);
+        }
+        self.geometry.clone()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RoutedEdge {
     edge: GraphEdge,
     route: OrthogonalRoute,
+    status: RouteStatus,
     /// The colour the wire wears: the edge's own if it set one, else its
     /// source port's type, else none and the kind decides.
     tint: Option<Hsla>,
@@ -1280,6 +1404,7 @@ struct RouteInputs {
     edges: Vec<GraphEdge>,
     routing: GraphRouting,
     metrics: RouteMetrics,
+    clearance: (f32, f32),
     colors: Vec<Option<Hsla>>,
 }
 
@@ -1296,6 +1421,11 @@ impl RouteInputs {
             && self.edges == edges
             && self.routing == routing
             && self.metrics == RouteMetrics::of(theme)
+            && self.clearance
+                == (
+                    theme.measures.node_edge_corner,
+                    theme.measures.node_edge_width,
+                )
             && self.colors.iter().zip(edges).all(|(previous, edge)| {
                 *previous
                     == edge.edge_color().map(|color| {
@@ -1317,6 +1447,10 @@ impl RouteInputs {
             edges: edges.to_vec(),
             routing,
             metrics: RouteMetrics::of(theme),
+            clearance: (
+                theme.measures.node_edge_corner,
+                theme.measures.node_edge_width,
+            ),
             colors: edges
                 .iter()
                 .map(|edge| {
@@ -1334,7 +1468,154 @@ impl RouteInputs {
 #[derive(Default)]
 struct RouteCache {
     inputs: Option<RouteInputs>,
-    routes: Vec<RoutedEdge>,
+    routes: Rc<Vec<RoutedEdge>>,
+    index: super::spatial::BoundsIndex,
+    motion: super::route_motion::RouteMotion,
+    displayed: Rc<Vec<RoutedEdge>>,
+}
+
+impl RouteCache {
+    fn show(
+        &mut self,
+        geometry: &[NodeGeometry],
+        theme: &gpui_kit_theme::Theme,
+        now: Instant,
+        policy: crate::motion::ResolvedMotion,
+        animate: bool,
+    ) -> (Rc<Vec<RoutedEdge>>, bool) {
+        let animate = animate && policy.animates();
+        if !animate {
+            self.motion = Default::default();
+            if Rc::ptr_eq(&self.displayed, &self.routes) {
+                return (self.routes.clone(), false);
+            }
+        }
+        let by_id: HashMap<_, _> = geometry
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (&n.id, i))
+            .collect();
+        let mut validator = None;
+        let mut displayed = self.routes.clone();
+        let mut moving = false;
+        self.motion.begin();
+        for (index, routed) in self.routes.iter().enumerate() {
+            if !animate || routed.status != RouteStatus::Clear {
+                continue;
+            }
+            let (route, active) = self.motion.sample(
+                &routed.edge,
+                &routed.route,
+                now,
+                policy.spec(),
+                |candidate| {
+                    let points = routed.route.points();
+                    let Some(last) = points.len().checked_sub(1).filter(|&last| last > 0) else {
+                        return false;
+                    };
+                    let side = |a: Point<f32>, b: Point<f32>| {
+                        if a.y == b.y {
+                            if b.x > a.x {
+                                PortSide::Right
+                            } else {
+                                PortSide::Left
+                            }
+                        } else if b.y > a.y {
+                            PortSide::Bottom
+                        } else {
+                            PortSide::Top
+                        }
+                    };
+                    let (Some(&from), Some(&to)) =
+                        (by_id.get(routed.edge.from()), by_id.get(routed.edge.to()))
+                    else {
+                        return false;
+                    };
+                    validator
+                        .get_or_insert_with(|| {
+                            Router::new(
+                                geometry.iter().map(|n| n.bounds),
+                                theme.measures.node_edge_corner,
+                                theme.measures.node_edge_width,
+                            )
+                        })
+                        .accepts(
+                            candidate,
+                            Anchor {
+                                point: points[0],
+                                side: side(points[0], points[1]),
+                            },
+                            Anchor {
+                                point: points[last],
+                                side: side(points[last], points[last - 1]),
+                            },
+                            [from, to],
+                        )
+                },
+            );
+            if route.points() != routed.route.points() {
+                Rc::make_mut(&mut displayed)[index].route = route;
+            }
+            moving |= active;
+        }
+        self.motion.finish();
+        // Culling, labels, semantic targets and paint consume this same sample.
+        // Include endpoint cards exactly as the canonical route index does.
+        if !Rc::ptr_eq(&displayed, &self.displayed) {
+            self.index.update(displayed.iter().map(|routed| {
+                let bounds = routed
+                    .route
+                    .points()
+                    .iter()
+                    .map(|&p| Bounds::new(p, size(0., 0.)))
+                    .reduce(super::spatial::union)
+                    .unwrap_or_default();
+                [routed.edge.from(), routed.edge.to()]
+                    .into_iter()
+                    .filter_map(|id| by_id.get(id).map(|&i| geometry[i].bounds))
+                    .fold(bounds, super::spatial::union)
+            }));
+        }
+        self.displayed = displayed.clone();
+        (displayed, moving)
+    }
+
+    fn resolve_inputs(
+        &mut self,
+        edges: &[GraphEdge],
+        routing: GraphRouting,
+        theme: &gpui_kit_theme::Theme,
+        geometry: &[NodeGeometry],
+    ) -> Rc<Vec<RoutedEdge>> {
+        if !self
+            .inputs
+            .as_ref()
+            .is_some_and(|inputs| inputs.matches(geometry, edges, routing, theme))
+        {
+            self.routes = Rc::new(NodeGraph::routable_edges(edges, routing, theme, geometry));
+            let mut by_id = HashMap::with_capacity(geometry.len());
+            for node in geometry {
+                by_id.entry(&node.id).or_insert(node.bounds);
+            }
+            self.index.update(self.routes.iter().map(|route| {
+                let bounds = route
+                    .route
+                    .points()
+                    .iter()
+                    .map(|at| Bounds::new(*at, size(0., 0.)))
+                    .reduce(super::spatial::union)
+                    .unwrap_or_default();
+                // Preserve endpoint-card visibility semantics, including
+                // oversized cards whose socket lies beyond the viewport.
+                [route.edge.from(), route.edge.to()]
+                    .into_iter()
+                    .filter_map(|id| by_id.get(id))
+                    .fold(bounds, |bounds, node| super::spatial::union(bounds, *node))
+            }));
+            self.inputs = Some(RouteInputs::new(geometry, edges, routing, theme));
+        }
+        Rc::clone(&self.routes)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1347,12 +1628,12 @@ struct ConnectionPreview {
 
 /// A node and where its top left corner sits, in canvas coordinates.
 pub struct Placed {
-    node: GraphNode,
-    x: f32,
-    y: f32,
+    pub(super) node: GraphNode,
+    pub(super) x: f32,
+    pub(super) y: f32,
     /// A height the caller declared, for a card whose content the node cannot
     /// measure. Left unset, the node measures itself.
-    height: Option<f32>,
+    pub(super) height: Option<f32>,
 }
 
 impl Placed {
@@ -1446,6 +1727,7 @@ pub struct NodeGraph {
     ident: Ident,
     nodes: Vec<Placed>,
     edges: Vec<GraphEdge>,
+    source: Option<GraphSource>,
     bands: Vec<GraphBand>,
     state: GraphState,
     empty: Option<EmptyState>,
@@ -1463,6 +1745,7 @@ pub struct NodeGraph {
     fit: GraphFit,
     fit_clearance: Edges<f32>,
     routing: GraphRouting,
+    animate_layout: bool,
 }
 
 /// Whether a canvas frames its own content before the reader touches it.
@@ -1525,6 +1808,7 @@ impl NodeGraph {
             ident: ident.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            source: None,
             bands: Vec::new(),
             state: GraphState::Ready,
             empty: None,
@@ -1542,26 +1826,57 @@ impl NodeGraph {
             fit: GraphFit::Never,
             fit_clearance: Edges::default(),
             routing: GraphRouting::Lanes,
+            animate_layout: true,
         }
     }
 
+    /// Animates caller-applied bounds of explicitly sized nodes using the
+    /// Navigation policy. Automatic-height nodes retain measured instant
+    /// layout. First mount, direct manipulation and reduced motion snap.
+    /// Current caller content is never delayed by the layout transition.
+    /// Newly published identities fade in; initial mount and viewport culling
+    /// do not replay entrances. Also controls removed-card and route paint retirement.
+    /// Unsupported recordings retire immediately; disabling drops pictures.
+    /// Compatible lane corridors interpolate with current ports pinned. Every
+    /// intermediate uses global clearance checks; incompatible topology or an
+    /// obstructed sample snaps to the solved route. Labels, culling and semantic
+    /// targets follow that exact displayed route. Curves follow current nodes.
+    pub fn animate_layout(mut self, animate: bool) -> Self {
+        self.animate_layout = animate;
+        self
+    }
+
     pub fn node(mut self, node: GraphNode, x: f32, y: f32) -> Self {
+        self.source = None;
         self.nodes.push(Placed::new(node, x, y));
         self
     }
 
     pub fn placed(mut self, placed: Placed) -> Self {
+        self.source = None;
         self.nodes.push(placed);
         self
     }
 
     pub fn edge(mut self, edge: GraphEdge) -> Self {
+        self.source = None;
         self.edges.push(edge);
         self
     }
 
     pub fn edges(mut self, edges: impl IntoIterator<Item = GraphEdge>) -> Self {
+        self.source = None;
         self.edges.extend(edges);
+        self
+    }
+
+    /// Uses caller-shared metadata and lazy visible-card factories instead of
+    /// consumed nodes/edges. Subsequent node/placed/edge builders select the
+    /// legacy path again; the two models are never silently merged.
+    pub fn source(mut self, source: GraphSource) -> Self {
+        self.nodes.clear();
+        self.edges.clear();
+        self.source = Some(source);
         self
     }
 
@@ -1733,23 +2048,29 @@ impl NodeGraph {
     /// row sat below the card's top in graph units. A side port with a row
     /// anchors at that row's middle; one without — a top or bottom port, or a
     /// card not yet measured — divides its edge evenly with its siblings.
+    #[cfg(test)]
     fn geometry_with_heights(
         &self,
         theme: &gpui_kit_theme::Theme,
         measured_heights: &HashMap<SharedString, f32>,
         port_rows: &HashMap<SharedString, f32>,
     ) -> Vec<NodeGeometry> {
-        let node_counts = self
-            .nodes
-            .iter()
-            .fold(HashMap::new(), |mut counts, placed| {
-                *counts
-                    .entry(placed.node.ident().semantic_id())
-                    .or_insert(0usize) += 1;
-                counts
-            });
-        self.nodes
-            .iter()
+        Self::geometry_nodes(self.nodes.iter(), theme, measured_heights, port_rows)
+    }
+
+    fn geometry_nodes<'a>(
+        nodes: impl Iterator<Item = &'a Placed> + Clone,
+        theme: &gpui_kit_theme::Theme,
+        measured_heights: &HashMap<SharedString, f32>,
+        port_rows: &HashMap<SharedString, f32>,
+    ) -> Vec<NodeGeometry> {
+        let node_counts = nodes.clone().fold(HashMap::new(), |mut counts, placed| {
+            *counts
+                .entry(placed.node.ident().semantic_id())
+                .or_insert(0usize) += 1;
+            counts
+        });
+        nodes
             .filter(|placed| node_counts.get(&placed.node.ident().semantic_id()) == Some(&1))
             .map(|placed| {
                 let id = placed.node.ident().semantic_id();
@@ -1829,28 +2150,45 @@ impl NodeGraph {
         self.routable_geometry(theme, &nodes)
     }
 
+    #[cfg(test)]
     fn routable_geometry(
         &self,
         theme: &gpui_kit_theme::Theme,
         nodes: &[NodeGeometry],
     ) -> Vec<RoutedEdge> {
+        Self::routable_edges(&self.edges, self.routing, theme, nodes)
+    }
+
+    fn routable_edges(
+        edges: &[GraphEdge],
+        routing: GraphRouting,
+        theme: &gpui_kit_theme::Theme,
+        nodes: &[NodeGeometry],
+    ) -> Vec<RoutedEdge> {
         let metrics = RouteMetrics::of(theme);
-        let counts = self.edges.iter().fold(HashMap::new(), |mut m, e| {
+        let counts = edges.iter().fold(HashMap::new(), |mut m, e| {
             *m.entry(e.edge_id()).or_insert(0usize) += 1;
             m
         });
         // Preserve first-match identity semantics without rescanning every
         // node for each endpoint on a cache miss.
         let mut by_id = HashMap::with_capacity(nodes.len());
-        for node in nodes {
-            by_id.entry(&node.id).or_insert(node);
+        for (index, node) in nodes.iter().enumerate() {
+            by_id.entry(&node.id).or_insert((index, node));
         }
-        self.edges
+        let mut obstacles = (routing == GraphRouting::Lanes).then(|| {
+            Router::new(
+                nodes.iter().map(|node| node.bounds),
+                theme.measures.node_edge_corner,
+                theme.measures.node_edge_width,
+            )
+        });
+        edges
             .iter()
             .filter(|edge| counts.get(&edge.edge_id()) == Some(&1))
             .filter_map(|edge| {
-                let from = by_id.get(edge.from())?;
-                let to = by_id.get(edge.to())?;
+                let (from_index, from) = *by_id.get(edge.from())?;
+                let (to_index, to) = *by_id.get(edge.to())?;
                 let (a, b, port_tint) = match (edge.source_port(), edge.target_port()) {
                     (Some(a), Some(b)) => {
                         let a = from.ports.iter().find(|p| &p.id == a)?;
@@ -1876,7 +2214,7 @@ impl NodeGraph {
                             .text
                     })
                     .or(port_tint);
-                let route = match self.routing {
+                let route = match routing {
                     GraphRouting::Lanes => route_orthogonal(
                         a,
                         b,
@@ -1888,9 +2226,14 @@ impl NodeGraph {
                     )?,
                     GraphRouting::Curves => route_curved(a, b),
                 };
+                let (route, status) = match &mut obstacles {
+                    Some(router) => router.resolve(route, a, b, [from_index, to_index], metrics),
+                    None => (route, RouteStatus::Clear),
+                };
                 Some(RoutedEdge {
                     edge: edge.clone(),
                     route,
+                    status,
                     tint,
                 })
             })
@@ -1977,17 +2320,48 @@ fn normalized_connection(
 }
 
 impl RenderOnce for NodeGraph {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        // Use GPUI's existing same-frame container layout primitive. A cached
+        // measurement is unavailable on first mount and stale after resize;
+        // neither is a reason to instantiate every offscreen card.
+        gpui::container_query(move |available, window, cx| self.render_in(available, window, cx))
+    }
+}
+
+impl NodeGraph {
+    fn render_in(
+        mut self,
+        available: Size<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        if let Some(source) = self.source.clone() {
+            let data = source.data.borrow();
+            self.render_model(NodeItems::Source(&data), &data.edges, available, window, cx)
+        } else {
+            let nodes = std::mem::take(&mut self.nodes);
+            let edges = std::mem::take(&mut self.edges);
+            self.render_model(NodeItems::Owned(nodes), &edges, available, window, cx)
+        }
+    }
+
+    fn render_model(
+        self,
+        nodes: NodeItems<'_>,
+        edges: &[GraphEdge],
+        available: Size<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let mut viewport = self.viewport;
         viewport.zoom = viewport.zoom.clamp(self.zoom_range.0, self.zoom_range.1);
         let active_edges =
-            matches!(self.state, GraphState::Ready) && self.edges.iter().any(GraphEdge::is_active);
+            matches!(self.state, GraphState::Ready) && edges.iter().any(GraphEdge::is_active);
         let graph_busy = matches!(self.state, GraphState::Loading)
             || active_edges
             || (matches!(self.state, GraphState::Ready)
-                && self
-                    .nodes
+                && nodes
                     .iter()
                     .any(|placed| placed.node.node_state().is_busy()));
         let gesture = keyed::slot::<GestureState>(
@@ -1995,6 +2369,32 @@ impl RenderOnce for NodeGraph {
             window.window_handle().window_id(),
             cx,
         );
+        let layout_motion = keyed::slot::<super::geometry_motion::GeometryMotion>(
+            &self.ident.child("layout-motion").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let source_geometry = keyed::slot::<SourceGeometry>(
+            &self.ident.child("source-geometry").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let node_index = keyed::slot::<NodeIndex>(
+            &self.ident.child("node-index").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let route_cell = keyed::slot::<RouteCache>(
+            &self.ident.child("routes").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        if nodes.is_empty() || !matches!(self.state, GraphState::Ready) {
+            *layout_motion.borrow_mut() = Default::default();
+            *source_geometry.borrow_mut() = Default::default();
+            *node_index.borrow_mut() = Default::default();
+            *route_cell.borrow_mut() = Default::default();
+        }
         // Caller-owned identities and permissions may change between moves.
         // Keep surviving nodes' original drag origins, not deleted peers.
         {
@@ -2007,7 +2407,7 @@ impl RenderOnce for NodeGraph {
             }
             state.interaction = Some(self.interaction);
             let exists = |id: &SharedString| {
-                self.nodes
+                nodes
                     .iter()
                     .any(|node| node.node.ident().semantic_id() == *id)
             };
@@ -2023,7 +2423,7 @@ impl RenderOnce for NodeGraph {
                     }
                     Some(Gesture::Connect { from, .. }) => {
                         self.interaction.edits_topology()
-                            && self.nodes.iter().any(|node| {
+                            && nodes.iter().any(|node| {
                                 node.node.ident().semantic_id() == from.node
                                     && node
                                         .node
@@ -2064,6 +2464,38 @@ impl RenderOnce for NodeGraph {
         if travelling {
             window.request_animation_frame();
         }
+        let retirement = keyed::slot::<super::retirement::Retirement>(
+            &self.ident.child("retirement").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let route_retirement = keyed::slot::<super::retirement::Retirement>(
+            &self.ident.child("route-retirement").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let entrance_policy = MotionPolicy::resolve(MotionRole::Entrance, cx);
+        let exit_policy = MotionPolicy::resolve(MotionRole::Exit, cx);
+        let record_exits = self.animate_layout
+            && exit_policy.animates()
+            && matches!(self.state, GraphState::Ready);
+        if nodes.is_empty() || !record_exits {
+            route_retirement.borrow_mut().sync(
+                std::iter::empty(),
+                self.source.as_ref(),
+                record_exits,
+                cx.background_executor().now(),
+                exit_policy.spec(),
+            );
+        }
+        retirement.borrow_mut().sync(
+            nodes.iter().map(|placed| placed.node.ident().semantic_id()),
+            self.source.as_ref(),
+            record_exits,
+            cx.background_executor().now(),
+            exit_policy.spec(),
+        );
+        let retired = retirement.borrow().exits(viewport, window);
         let activity = MotionPolicy::resolve(MotionRole::Activity(Activity::Transmitting), cx);
         let edge_flow_phase = if active_edges && activity.animates() {
             let now = cx.background_executor().now();
@@ -2139,16 +2571,19 @@ impl RenderOnce for NodeGraph {
             }
         });
 
+        // Filled from this frame's displayed geometry below, before prepaint
+        // installs these handlers. Hit testing must not use the caller target
+        // while a card is still travelling toward it.
+        let interaction_geometry = Rc::new(RefCell::new(Rc::clone(
+            &gesture.borrow().interaction_nodes.nodes,
+        )));
         if let Some(report) = self
             .on_event
             .as_ref()
             .cloned()
-            .filter(|_| matches!(self.state, GraphState::Ready) && !self.nodes.is_empty())
+            .filter(|_| matches!(self.state, GraphState::Ready) && !nodes.is_empty())
         {
-            let interaction_nodes = gesture
-                .borrow_mut()
-                .interaction_nodes
-                .update(&self.nodes, &theme);
+            let interaction_nodes = Rc::clone(&interaction_geometry);
             let down = Rc::clone(&gesture);
             frame =
                 frame.on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, _, cx| {
@@ -2262,6 +2697,7 @@ impl RenderOnce for NodeGraph {
                             size((a.x - b.x).abs(), (a.y - b.y).abs()),
                         );
                         let ids = up_nodes
+                            .borrow()
                             .iter()
                             .filter(|(_, bounds)| bounds_overlap(*bounds, box_bounds, 0.0))
                             .map(|(id, _)| id.clone())
@@ -2287,7 +2723,11 @@ impl RenderOnce for NodeGraph {
                     ),
                     viewport,
                 );
-                if context_nodes.iter().any(|(_, bounds)| bounds.contains(&at)) {
+                if context_nodes
+                    .borrow()
+                    .iter()
+                    .any(|(_, bounds)| bounds.contains(&at))
+                {
                     return;
                 }
                 context_report(
@@ -2364,7 +2804,7 @@ impl RenderOnce for NodeGraph {
                 .into_any_element();
         }
 
-        if self.nodes.is_empty() {
+        if nodes.is_empty() {
             let empty = self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
                 self.empty
                     .map(IntoElement::into_any_element)
@@ -2387,14 +2827,18 @@ impl RenderOnce for NodeGraph {
                     self.axes,
                     self.ground_light,
                 ))
+                .children(route_retirement.borrow().exits(viewport, window))
+                .children(retired)
                 .child(empty)
                 .semantic_in(cx, spec.value(viewport_value("empty", asked)))
                 .into_any_element();
         }
 
-        let node_measurements: HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>> = self
-            .nodes
+        let node_measurements: HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>> = nodes
             .iter()
+            // Explicit height already owns layout, Fit and resize geometry.
+            // Do not allocate window measurement state for offscreen source cards.
+            .filter(|placed| placed.height.is_none())
             .map(|placed| {
                 let id = placed.node.ident().semantic_id();
                 let measurement_id = composite_id("node-measure", &[id.as_ref()]);
@@ -2411,8 +2855,7 @@ impl RenderOnce for NodeGraph {
         // Where each side port's name row sat on the last frame, in graph
         // units below its card's top. A row that has not been measured yet
         // leaves its port to divide the card's edge with its siblings.
-        let port_rows: HashMap<SharedString, f32> = self
-            .nodes
+        let port_rows: HashMap<SharedString, f32> = nodes
             .iter()
             .filter(|placed| {
                 placed
@@ -2438,36 +2881,139 @@ impl RenderOnce for NodeGraph {
                     .then(|| (measurement_id, f32::from(bounds.origin.y)))
             })
             .collect();
-        let geometry = self.geometry_with_heights(&theme, &measured_heights, &port_rows);
-        let route_cell = keyed::slot::<RouteCache>(
-            &self.ident.child("routes").semantic_id(),
-            window.window_handle().window_id(),
-            cx,
-        );
-        let routes =
+        let mut geometry = if let Some(source) = &self.source {
+            if !source_geometry
+                .borrow()
+                .source
+                .as_ref()
+                .is_some_and(|previous| previous.ptr_eq(&Rc::downgrade(&source.data)))
             {
-                let mut cache = route_cell.borrow_mut();
-                if cache.inputs.as_ref().is_some_and(|inputs| {
-                    inputs.matches(&geometry, &self.edges, self.routing, &theme)
-                }) {
-                    cache.routes.clone()
-                } else {
-                    let routes = self.routable_geometry(&theme, &geometry);
-                    cache.inputs = Some(RouteInputs::new(
-                        &geometry,
-                        &self.edges,
-                        self.routing,
-                        &theme,
-                    ));
-                    cache.routes = routes.clone();
-                    routes
-                }
-            };
-        let compact = viewport.zoom < LOD_ZOOM;
-        let view = {
-            let bounds = measured.get();
-            (f32::from(bounds.size.width) > 1.0).then(|| world_view(viewport, bounds))
+                route_cell.borrow_mut().motion = Default::default();
+            }
+            source_geometry
+                .borrow_mut()
+                .resolve(source, &theme, &port_rows)
+        } else {
+            if source_geometry.borrow().source.is_some() {
+                route_cell.borrow_mut().motion = Default::default();
+            }
+            *source_geometry.borrow_mut() = Default::default();
+            Rc::new(Self::geometry_nodes(
+                nodes.iter(),
+                &theme,
+                &measured_heights,
+                &port_rows,
+            ))
         };
+        // Automatic content must be measured by layout; animating its estimate
+        // would make routes disagree with the live card's actual height.
+        let automatic: HashSet<_> = nodes
+            .iter()
+            .filter(|placed| placed.height.is_none())
+            .map(|placed| placed.node.ident().semantic_id())
+            .collect();
+        let layout_policy = MotionPolicy::resolve(MotionRole::Navigation, cx);
+        let direct_layout = matches!(
+            gesture.borrow().gesture,
+            Some(Gesture::Node { .. } | Gesture::Resize { .. })
+        );
+        let (direct_positions, direct_sizes) = {
+            let mut state = gesture.borrow_mut();
+            (
+                std::mem::take(&mut state.direct_positions),
+                std::mem::take(&mut state.direct_sizes),
+            )
+        };
+        let now = cx.background_executor().now();
+        {
+            let mut motion = layout_motion.borrow_mut();
+            if !self.animate_layout || !layout_policy.animates() {
+                *motion = Default::default();
+            } else {
+                motion.begin();
+                for index in 0..geometry.len() {
+                    let node = &geometry[index];
+                    let target = node.bounds;
+                    if automatic.contains(&node.id)
+                        || target.size.width <= 0.
+                        || target.size.height <= 0.
+                    {
+                        continue;
+                    }
+                    let (shown, moving) = motion.sample(
+                        &node.id,
+                        target,
+                        direct_layout
+                            || direct_positions.get(&node.id) == Some(&target.origin)
+                            || direct_sizes.get(&node.id) == Some(&target.size),
+                        now,
+                        layout_policy.spec(),
+                    );
+                    if shown != target {
+                        let node = &mut Rc::make_mut(&mut geometry)[index];
+                        node.bounds = shown;
+                        for port in &mut node.ports {
+                            let fraction = point(
+                                (port.anchor.point.x - target.left()) / target.size.width,
+                                (port.anchor.point.y - target.top()) / target.size.height,
+                            );
+                            port.anchor.point = point(
+                                shown.left() + fraction.x * shown.size.width,
+                                shown.top() + fraction.y * shown.size.height,
+                            );
+                            if matches!(port.anchor.side, PortSide::Left | PortSide::Right)
+                                && let Some(offset) =
+                                    port_rows.get(&port_measure_id(&node.id, &port.id))
+                            {
+                                port.anchor.point.y =
+                                    (shown.top() + offset).clamp(shown.top(), shown.bottom());
+                            }
+                        }
+                    }
+                    if moving {
+                        window.request_animation_frame();
+                    }
+                }
+                motion.finish();
+            }
+        }
+        let displayed_bounds: HashMap<_, _> = geometry
+            .iter()
+            .map(|node| (node.id.clone(), node.bounds))
+            .collect();
+        if self.on_event.is_some() {
+            *interaction_geometry.borrow_mut() = gesture
+                .borrow_mut()
+                .interaction_nodes
+                .update(geometry.iter().map(|node| (node.id.clone(), node.bounds)));
+        }
+        let (routes, moving_routes) = {
+            let mut cache = route_cell.borrow_mut();
+            cache.resolve_inputs(edges, self.routing, &theme, &geometry);
+            cache.show(
+                &geometry,
+                &theme,
+                now,
+                layout_policy,
+                self.animate_layout && !direct_layout && self.routing == GraphRouting::Lanes,
+            )
+        };
+        if moving_routes {
+            window.request_animation_frame();
+        }
+        route_retirement.borrow_mut().sync(
+            routes.iter().map(|routed| routed.edge.edge_id()),
+            self.source.as_ref(),
+            record_exits,
+            cx.background_executor().now(),
+            exit_policy.spec(),
+        );
+        let retired_routes = route_retirement.borrow().exits(viewport, window);
+        let compact = viewport.zoom < LOD_ZOOM;
+        let view = Some(world_view(
+            viewport,
+            Bounds::new(point(px(0.), px(0.)), available),
+        ));
         // Read out rather than borrowed in place: a borrow held in an `if let`
         // scrutinee lives as long as the block, and the block takes the same
         // cell mutably to record what it framed.
@@ -2517,19 +3063,15 @@ impl RenderOnce for NodeGraph {
             &relationship_sizes,
             pending_frame.is_none().then_some(view).flatten(),
             self.on_event.is_some() && self.interaction.edits_topology(),
+            &[],
         );
         let relationship_bounds: Vec<Bounds<f32>> = relationship_placements
             .values()
             .map(|placement| placement.desired)
             .collect();
-        // Waiting for real heights is the whole point: framing from the
-        // estimate would leave the tallest card half outside the frame it was
-        // supposed to guarantee. Every card has to be measured, not just one —
-        // the ones a frame is most likely to leave out are exactly the far ones
-        // the opening viewport never drew.
-        let every_card_measured = geometry
-            .iter()
-            .all(|node| measured_heights.contains_key(&node.id));
+        // Caller-declared height is already the actual layout contract. Only
+        // automatic-height cards need mounting before Fit can trust the box.
+        let every_card_measured = automatic.iter().all(|id| measured_heights.contains_key(id));
         let overlay_offset = theme.space(Space::Sm);
         let every_overlay_measured = toolbar_measured.as_ref().is_none_or(|measured| {
             let size = measured.get().size;
@@ -2579,31 +3121,60 @@ impl RenderOnce for NodeGraph {
                 report(&NodeGraphEvent::ViewportChanged(framed), window, cx);
             });
         }
-        let visible_ids: std::collections::HashSet<SharedString> = geometry
-            .iter()
-            .filter(|node| {
-                // A card outside the opening view is never drawn, so it is
-                // never measured, so a frame waiting on measurements would
-                // wait forever for the very cards it exists to bring in. While
-                // a frame is owed, everything is drawn once.
-                pending_frame.is_some()
-                    || view
-                        .map(|view| bounds_overlap(node.bounds, view, CULL_PAD))
-                        .unwrap_or(true)
-            })
-            .map(|node| node.id.clone())
-            .collect();
-        let routes: Vec<RoutedEdge> = routes
+        node_index.borrow_mut().update(&geometry);
+        let visible_candidates = view.map(|view| node_index.borrow().index.query(view, CULL_PAD));
+        let visible_ids: std::collections::HashSet<SharedString> = visible_candidates
+            .unwrap_or_else(|| (0..geometry.len()).collect())
             .into_iter()
+            .map(|index| geometry[index].id.clone())
+            // Fit mounts automatic-height cards until their measured extent is
+            // known. Explicit source geometry requires no offscreen mounting.
+            .chain(pending_frame.into_iter().flat_map(|_| {
+                geometry
+                    .iter()
+                    .filter(|node| automatic.contains(&node.id))
+                    .map(|node| node.id.clone())
+            }))
+            .collect();
+        retirement.borrow_mut().keep_visible(&visible_ids);
+        let node_opacities: HashMap<_, _> = if record_exits {
+            let mut retirement = retirement.borrow_mut();
+            visible_ids
+                .iter()
+                .filter_map(|id| {
+                    let opacity = retirement.opacity(
+                        id,
+                        now,
+                        entrance_policy.spec(),
+                        direct_layout || !entrance_policy.animates(),
+                        window,
+                    );
+                    (opacity < 1.).then(|| (id.clone(), opacity))
+                })
+                .collect()
+        } else {
+            HashMap::new()
+        };
+        let candidates = if let Some(view) = view.filter(|_| pending_frame.is_none()) {
+            route_cell.borrow().index.query(view, CULL_PAD)
+        } else {
+            (0..routes.len()).collect()
+        };
+        let routes: Vec<RoutedEdge> = candidates
+            .into_iter()
+            .map(|index| &routes[index])
             .filter(|routed| {
-                // visible_ids already uses the identical padded bounds test.
-                // Routes only contain resolved endpoints, so no second O(V)
-                // endpoint scan is needed for each edge on every redraw.
-                view.is_none()
+                // Crossing routes remain visible even when both endpoint
+                // cards lie outside the viewport.
+                view.is_none_or(|view| routed.route.intersects(view, CULL_PAD))
                     || visible_ids.contains(routed.edge.from())
                     || visible_ids.contains(routed.edge.to())
             })
+            .cloned()
             .collect();
+        route_retirement
+            .borrow_mut()
+            .keep_visible(&routes.iter().map(|routed| routed.edge.edge_id()).collect());
         let hovered_edge = {
             let state = gesture.borrow();
             match (&state.gesture, state.pointer) {
@@ -2633,7 +3204,7 @@ impl RenderOnce for NodeGraph {
         let edge_colors: HashMap<SharedString, EdgeColors> = {
             let now = cx.background_executor().now();
             let mut gesture = gesture.borrow_mut();
-            gesture.edge_ids.update(&self.edges);
+            gesture.edge_ids.update(edges);
             let state = &mut *gesture;
             state
                 .edge_transitions
@@ -2643,8 +3214,7 @@ impl RenderOnce for NodeGraph {
                 .iter()
                 .filter_map(|routed| Some((routed.edge.edge_id(), routed.tint?)))
                 .collect();
-            let colors = self
-                .edges
+            let colors = edges
                 .iter()
                 .map(|edge| {
                     let id = edge.edge_id();
@@ -2737,19 +3307,15 @@ impl RenderOnce for NodeGraph {
                 .arrived
                 .retain(|id, _| state.edge_ids.ids.contains(id));
             let span = arrival.spec().total().as_secs_f32().max(f32::EPSILON);
-            self.edges
+            edges
                 .iter()
                 .map(GraphEdge::edge_id)
                 .map(|id| {
-                    let born = *state.arrived.entry(id.clone()).or_insert(now);
+                    let born = state.arrived.entry(id.clone()).or_insert(Some(now));
                     // A canvas opening onto a graph draws it rather than
                     // animating every connection in at once, and reduced
                     // motion settles the same way.
-                    let reveal = if !opened || !arrival.animates() {
-                        1.0
-                    } else {
-                        (now.duration_since(born).as_secs_f32() / span).clamp(0.0, 1.0)
-                    };
+                    let reveal = edge_arrival(born, now, span, !opened || !arrival.animates());
                     (id, reveal)
                 })
                 .collect()
@@ -2778,6 +3344,7 @@ impl RenderOnce for NodeGraph {
                     let transform =
                         RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom);
                     for (routed, reveal) in painted_routes {
+                        let mark = record_exits.then(|| window.paint_mark());
                         let id = routed.edge.edge_id();
                         let colors = edge_colors.get(&id).copied().unwrap_or_else(|| match routed
                             .tint
@@ -2799,6 +3366,16 @@ impl RenderOnce for NodeGraph {
                                 .phase(routed.edge.is_active().then_some(edge_flow_phase).flatten())
                                 .hovered(hovered_edge.as_ref() == Some(&id)),
                         );
+                        if let Some(mark) = mark {
+                            route_retirement.borrow_mut().capture_route(
+                                id,
+                                mark,
+                                bounds.origin,
+                                viewport,
+                                window,
+                                now,
+                            );
+                        }
                     }
                     if let Some(preview) = painted_preview {
                         // A proposal that has found a port is drawn as the
@@ -2955,8 +3532,15 @@ impl RenderOnce for NodeGraph {
                     .edge_label()
                     .cloned()
                     .unwrap_or_else(|| cx.strings().text(StringKey::CanvasConnection));
-                let description: SharedString =
-                    format!("{relation}; state {}", routed.edge.edge_state().value()).into();
+                let state = cx.strings().text(match routed.edge.edge_state() {
+                    EdgeState::Idle => StringKey::GraphEdgeIdle,
+                    EdgeState::Active => StringKey::GraphEdgeActive,
+                    EdgeState::Succeeded => StringKey::GraphEdgeSucceeded,
+                    EdgeState::Failed => StringKey::GraphEdgeFailed,
+                });
+                let description = cx
+                    .strings()
+                    .format(StringKey::GraphEdgeDescription, &[&relation, &state]);
                 if let Some(report) = self
                     .on_event
                     .as_ref()
@@ -3056,12 +3640,115 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
+        let warnings: Vec<_> = routes
+            .iter()
+            .filter_map(|routed| {
+                let (key, value) = routed.status.warning()?;
+                let edge_id = routed.edge.edge_id();
+                let ident = self
+                    .ident
+                    .child(composite_id("route-status", &[edge_id.as_ref()]));
+                let measurement = measure::cell(&ident.child("measure").semantic_id(), window, cx);
+                Some((edge_id, ident, cx.strings().text(key), value, measurement))
+            })
+            .collect();
+        let warning_sizes: HashMap<_, _> = warnings
+            .iter()
+            .map(|(id, _, text, _, measurement)| {
+                let measured = measurement.get().size;
+                let measured = size(f32::from(measured.width), f32::from(measured.height));
+                let estimate = estimated_relationship_label_size(text, &theme);
+                (
+                    id.clone(),
+                    if measured.width > 0. && measured.height > 0. {
+                        measured
+                    } else {
+                        size(
+                            estimate.width + theme.typography.caption.size + theme.spacing.xxs,
+                            estimate.height + theme.spacing.xxs * 2.,
+                        )
+                    },
+                )
+            })
+            .collect();
+        let warning_placements = if warning_sizes.is_empty() {
+            HashMap::new()
+        } else {
+            place_relationship_labels(
+                &routes,
+                &geometry,
+                &warning_sizes,
+                view,
+                self.on_event.is_some() && self.interaction.edits_topology(),
+                &relationship_placements
+                    .values()
+                    .map(|placed| placed.shown)
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let route_warnings: Vec<_> = warnings
+            .into_iter()
+            .filter_map(|(edge_id, ident, text, value, measurement)| {
+                let at = world_to_screen(warning_placements.get(&edge_id)?.shown.origin, viewport);
+                Some(
+                    div()
+                        .absolute()
+                        .left(px(at.x))
+                        .top(px(at.y))
+                        .on_children_prepainted(move |bounds, window, _| {
+                            if let Some(first) = bounds.first() {
+                                measure::record(
+                                    &measurement,
+                                    Bounds::new(
+                                        point(px(0.), px(0.)),
+                                        size(
+                                            first.size.width / viewport.zoom,
+                                            first.size.height / viewport.zoom,
+                                        ),
+                                    ),
+                                    window,
+                                );
+                            }
+                        })
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(theme.spacing.xxs * viewport.zoom))
+                                .px(px(theme.spacing.xs * viewport.zoom))
+                                .py(px(theme.spacing.xxs * viewport.zoom))
+                                .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
+                                .bg(theme.colors.panel)
+                                .text_color(theme.colors.text)
+                                .text_size(px(theme.typography.caption.size * viewport.zoom))
+                                .line_height(px(
+                                    theme.typography.caption.line_height * viewport.zoom
+                                ))
+                                .whitespace_nowrap()
+                                .child(
+                                    icon(Icon::Danger)
+                                        .size(px(theme.typography.caption.size * viewport.zoom))
+                                        .text_color(theme.colors.warning),
+                                )
+                                .child(text.clone())
+                                .semantic_in(
+                                    cx,
+                                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                                        .parent(self.ident.semantic_id())
+                                        .text(text)
+                                        .value(value),
+                                ),
+                        )
+                        .into_any_element(),
+                )
+            })
+            .collect();
+
         // Which ports are wired is something the graph already knows and used
         // to throw away. A port that is named by an edge and a port that is
         // waiting for one are the two states a reader is looking for when they
         // open a graph editor at all.
-        let wired: HashSet<(SharedString, SharedString)> = self
-            .edges
+        let wired: HashSet<(SharedString, SharedString)> = edges
             .iter()
             .flat_map(|edge| {
                 [
@@ -3085,13 +3772,16 @@ impl RenderOnce for NodeGraph {
         }
 
         let mut ports = Vec::new();
-        let mut placed_by_id = HashMap::with_capacity(self.nodes.len());
-        for placed in &self.nodes {
+        let mut placed_by_id = HashMap::with_capacity(nodes.len());
+        for placed in nodes.iter() {
             placed_by_id
                 .entry(placed.node.ident().semantic_id())
                 .or_insert(placed);
         }
-        for node in geometry.iter().filter(|_| !compact) {
+        for node in geometry
+            .iter()
+            .filter(|node| !compact && visible_ids.contains(&node.id))
+        {
             let Some(placed) = placed_by_id.get(&node.id) else {
                 continue;
             };
@@ -3304,9 +3994,14 @@ impl RenderOnce for NodeGraph {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .when(candidate == Some(false) && target.is_none(), |element| {
-                        element.opacity(theme.opacity.disabled)
-                    })
+                    .opacity(
+                        node_opacities.get(&node.id).copied().unwrap_or(1.)
+                            * if candidate == Some(false) && target.is_none() {
+                                theme.opacity.disabled
+                            } else {
+                                1.
+                            },
+                    )
                     .children(settle)
                     .child(mark)
                     .children(floating.then_some(label));
@@ -3409,28 +4104,25 @@ impl RenderOnce for NodeGraph {
 
         let report = self.on_event.clone();
         let interaction = self.interaction;
-        let starts: HashMap<SharedString, Point<f32>> = self
-            .nodes
+        let starts: HashMap<SharedString, Point<f32>> = nodes
             .iter()
             .map(|placed| (placed.node.ident().semantic_id(), point(placed.x, placed.y)))
             .collect();
-        let selected: Vec<SharedString> = self
-            .nodes
+        let selected: Vec<SharedString> = nodes
             .iter()
             .filter(|placed| placed.node.node_selected())
             .map(|placed| placed.node.ident().semantic_id())
             .collect();
-        let cards: Vec<AnyElement> = self
-            .nodes
+        let cards: Vec<AnyElement> = nodes
+            .visible(&visible_ids)
             .into_iter()
-            .filter(|placed| {
-                let id = placed.node.ident().semantic_id();
-                visible_ids.contains(&id) && geometry.iter().any(|node| node.id == id)
-            })
             .map(|placed| {
-                let screen = world_to_screen(point(placed.x, placed.y), viewport);
-                let height = placed.height;
                 let id = placed.node.ident().semantic_id();
+                let shown = displayed_bounds[&id];
+                let screen = world_to_screen(shown.origin, viewport);
+                let caller_width = placed.node.node_width();
+                let caller_height = placed.height;
+                let height = caller_height.map(|_| shown.size.height);
                 let measurement = node_measurements.get(&id).cloned();
                 let click = placed.node.click_handler();
                 let pointer_click = report.is_none();
@@ -3468,6 +4160,7 @@ impl RenderOnce for NodeGraph {
                 } else {
                     placed.node
                 };
+                let node = node.width(shown.size.width);
                 let node_width = node.node_width();
                 let mut card = div()
                     .absolute()
@@ -3505,8 +4198,8 @@ impl RenderOnce for NodeGraph {
                         let grip = theme.measures.node_port * viewport.zoom;
                         let handle_id = composite_id("node-resize", &[id.as_ref()]);
                         let start = size(
-                            node_width,
-                            height
+                            caller_width,
+                            caller_height
                                 .or_else(|| measured_heights.get(&id).copied())
                                 .unwrap_or(0.0),
                         );
@@ -3582,6 +4275,10 @@ impl RenderOnce for NodeGraph {
                                 );
                                 let id = id.clone();
                                 drop(state);
+                                moving
+                                    .borrow_mut()
+                                    .direct_sizes
+                                    .insert(id.clone(), proposed);
                                 resize_report(
                                     &NodeGraphEvent::NodeResized { id, size: proposed },
                                     window,
@@ -3683,6 +4380,10 @@ impl RenderOnce for NodeGraph {
                         drop(state);
                         if moves_nodes {
                             for (id, position) in moves {
+                                moving
+                                    .borrow_mut()
+                                    .direct_positions
+                                    .insert(id.clone(), position);
                                 move_report(
                                     &NodeGraphEvent::NodeMoved { id, position },
                                     window,
@@ -3717,7 +4418,17 @@ impl RenderOnce for NodeGraph {
                         cx.stop_propagation();
                     });
                 }
-                card.into_any_element()
+                if let Some(opacity) = node_opacities.get(&id) {
+                    card = card.opacity(*opacity);
+                }
+                let card = card.into_any_element();
+                if record_exits {
+                    retirement
+                        .borrow_mut()
+                        .capture(id, card, shown.origin, viewport.zoom, now)
+                } else {
+                    card
+                }
             })
             .collect();
 
@@ -3876,6 +4587,7 @@ impl RenderOnce for NodeGraph {
         frame
             .child(ground)
             .children(if compact { Vec::new() } else { bands })
+            .children(retired_routes)
             .child(beneath)
             .children(if compact && pending_frame.is_none() {
                 Vec::new()
@@ -3888,9 +4600,11 @@ impl RenderOnce for NodeGraph {
                 edge_labels
             })
             .children(group)
+            .children(retired)
             .children(cards)
             .children(ports)
             .children(edge_nodes)
+            .children(route_warnings)
             .children(marquee)
             .children(overview)
             .children(toolbar)
@@ -4212,6 +4926,225 @@ fn paint_grid(
 mod tests {
     use super::*;
 
+    #[test]
+    fn source_geometry_reuses_hits_and_recomputes_only_changed_dependencies() {
+        let placed = |id: &str, x| {
+            Placed::new(
+                GraphNode::new(id.to_owned(), "Node")
+                    .width(137.)
+                    .port(GraphPort::output("out", "Out")),
+                x,
+                31.,
+            )
+            .height(113.)
+        };
+        let source = GraphSource::new(
+            (0..1000).map(|i| placed(&format!("n{i}"), i as f32 * 170.)),
+            [],
+        )
+        .expect("source");
+        let theme = gpui_kit_theme::Theme::studio_light();
+        let mut cache = SourceGeometry::default();
+        let mut rows = HashMap::new();
+        let first = cache.resolve(&source, &theme, &rows);
+        assert_eq!(cache.builds, 1000);
+        assert!(Rc::ptr_eq(
+            &first,
+            &cache.resolve(&source.clone(), &theme.clone(), &rows)
+        ));
+        assert_eq!(cache.builds, 1000);
+        assert!(source.upsert(placed("n73", f32::NAN)).is_err());
+        assert!(Rc::ptr_eq(&first, &cache.resolve(&source, &theme, &rows)));
+        assert_eq!(
+            cache.builds, 1000,
+            "failed upsert changes no derived geometry"
+        );
+        source
+            .set_content("n73", |_, _| div().into_any_element())
+            .expect("factory change");
+        assert!(Rc::ptr_eq(&first, &cache.resolve(&source, &theme, &rows)));
+        assert_eq!(cache.builds, 1000, "factory publication is not geometry");
+        source.upsert(placed("n73", -91.)).expect("move");
+        let moved = cache.resolve(&source, &theme, &rows);
+        assert_eq!(cache.builds, 1001);
+        assert_eq!(moved[73].bounds.left(), -91.);
+        assert_eq!(
+            first[73].bounds.left(),
+            12410.,
+            "old immutable snapshot retained"
+        );
+        rows.insert(port_measure_id("n81", "out"), 19.);
+        let measured = cache.resolve(&source, &theme, &rows);
+        assert_eq!(cache.builds, 1002);
+        assert_eq!(measured[81].ports[0].anchor.point.y, 50.);
+        assert_ne!(moved[81].ports[0].anchor.point.y, 50.);
+        rows.clear();
+        cache.resolve(&source, &theme, &rows);
+        assert_eq!(cache.builds, 1003);
+        let adjusted = theme
+            .clone()
+            .modify(|theme| theme.colors.text_faint = gpui::rgb(0x572193).into());
+        let rethemed = cache.resolve(&source, &adjusted, &rows);
+        assert_eq!(cache.builds, 2003);
+        assert_eq!(
+            *rethemed,
+            NodeGraph::geometry_nodes(
+                NodeItems::Source(&source.data.borrow()).iter(),
+                &adjusted,
+                &HashMap::new(),
+                &rows
+            )
+        );
+        source.remove("n73");
+        source.upsert(placed("n73", -91.)).expect("reinsert");
+        let reordered = cache.resolve(&source, &adjusted, &rows);
+        assert_eq!(cache.builds, 2004);
+        assert_eq!(reordered.last().expect("last").id, "n73");
+        let other = GraphSource::new([placed("n73", 49.)], []).expect("other source");
+        let replaced = cache.resolve(&other, &adjusted, &rows);
+        assert_eq!(replaced.len(), 1);
+        assert_eq!(replaced[0].bounds.left(), 49.);
+        assert_eq!(cache.entries.len(), 1);
+    }
+
+    #[test]
+    fn routing_cache_invalidates_corner_and_stroke_clearance() {
+        let mut theme = gpui_kit_theme::Theme::studio_light();
+        let inputs = RouteInputs::new(&[], &[], GraphRouting::Lanes, &theme);
+        theme = theme.modify(|theme| theme.measures.node_edge_corner += 1.);
+        assert!(!inputs.matches(&[], &[], GraphRouting::Lanes, &theme));
+        theme = theme.modify(|theme| theme.measures.node_edge_corner -= 1.);
+        assert!(inputs.matches(&[], &[], GraphRouting::Lanes, &theme));
+        theme = theme.modify(|theme| theme.measures.node_edge_width += 1.);
+        assert!(!inputs.matches(&[], &[], GraphRouting::Lanes, &theme));
+    }
+
+    #[gpui::test]
+    fn live_routing_warning_is_localized_and_not_the_callers_edge_state(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::strings::TranslationPack;
+        use gpui_kit_testkit::harness::Harness;
+        let source = GraphSource::new(
+            [
+                Placed::new(GraphNode::new("from", "Source").width(120.), 0., 140.).height(80.),
+                Placed::new(GraphNode::new("to", "Destination").width(120.), 600., 140.)
+                    .height(80.),
+                Placed::new(
+                    GraphNode::new("obstacle", "Obstacle").width(100.),
+                    105.,
+                    155.,
+                )
+                .height(80.),
+            ],
+            [GraphEdge::new("from", "to")
+                .id("business-wire")
+                .state(EdgeState::Succeeded)],
+        )
+        .expect("source");
+        let nodes = source.clone();
+        let mut harness = Harness::new(cx, crate::install, move |_, _| {
+            div()
+                .w(px(800.))
+                .h(px(420.))
+                .child(
+                    NodeGraph::new("routing-test")
+                        .source(nodes.clone())
+                        .animate_layout(false),
+                )
+                .into_any_element()
+        });
+        harness.update(|_, cx| cx.set_global(TranslationPack::SimplifiedChinese.strings()));
+        harness.frame();
+        let warning = Ident::new("routing-test")
+            .child(composite_id("route-status", &["business-wire"]))
+            .semantic_id();
+        let edge = composite_id("graph-edge", &["business-wire"]);
+        let spec = harness.node(&warning).expect("warned fallback");
+        assert_eq!(spec.text.as_deref(), Some("未找到避开障碍的路径"));
+        assert_eq!(spec.value.as_deref(), Some("obstructed"));
+        assert_eq!(
+            harness
+                .node(&edge)
+                .expect("caller connection")
+                .description
+                .as_deref(),
+            Some("连接；状态：已成功")
+        );
+        assert_eq!(
+            harness
+                .node(&edge)
+                .expect("caller identity")
+                .value
+                .as_deref(),
+            Some("business-wire")
+        );
+        source
+            .replace_edges([GraphEdge::new("from", "to")
+                .id("business-wire")
+                .state(EdgeState::Failed)])
+            .expect("caller state update");
+        harness.frame();
+        assert_eq!(
+            harness
+                .node(&warning)
+                .expect("same warning identity")
+                .value
+                .as_deref(),
+            Some("obstructed")
+        );
+        assert_eq!(
+            harness
+                .node(&edge)
+                .expect("current connection")
+                .description
+                .as_deref(),
+            Some("连接；状态：已失败")
+        );
+        source
+            .upsert(
+                Placed::new(
+                    GraphNode::new("obstacle", "Obstacle").width(100.),
+                    280.,
+                    80.,
+                )
+                .height(220.),
+            )
+            .expect("accepted obstacle move");
+        harness.frame();
+        assert!(
+            harness.node(&warning).is_none(),
+            "successful global detour removes warning"
+        );
+        assert_eq!(
+            harness
+                .node(&edge)
+                .expect("connection retained")
+                .description
+                .as_deref(),
+            Some("连接；状态：已失败")
+        );
+        source.remove("obstacle");
+        harness.frame();
+        assert!(harness.node(&warning).is_none());
+        assert!(harness.node(&edge).is_some());
+    }
+
+    #[test]
+    fn settled_edge_entrance_never_restarts_when_motion_is_reenabled() {
+        let now = Instant::now();
+        let mut born = Some(now);
+        assert_eq!(edge_arrival(&mut born, now, 0.2, false), 0.);
+        let later = now + std::time::Duration::from_millis(50);
+        assert_eq!(edge_arrival(&mut born, later, 0.2, false), 0.25);
+        assert_eq!(edge_arrival(&mut born, later, 0.2, true), 1.);
+        assert_eq!(born, None);
+        assert_eq!(edge_arrival(&mut born, later, 0.2, false), 1.);
+        let mut first_frame = Some(now);
+        assert_eq!(edge_arrival(&mut first_frame, now, 0.2, true), 1.);
+        assert_eq!(edge_arrival(&mut first_frame, now, 0.2, false), 1.);
+    }
+
     /// A count of characters is not a width, and this is the string that
     /// proved it: four Chinese characters on a square body plus an ASCII
     /// path. Estimating every character at the Latin average made the label
@@ -4318,6 +5251,58 @@ mod tests {
                 tint: gpui_kit_theme::Theme::studio_dark().colors.accent,
             })
             .collect()
+    }
+
+    #[gpui::test]
+    fn route_index_tracks_the_displayed_corridor_and_disabled_snap(cx: &mut gpui::TestAppContext) {
+        use gpui_kit_testkit::harness::Harness;
+        let mut harness = Harness::new(cx, crate::install, |_, _| div().into_any_element());
+        let policy = harness.update(|_, cx| {
+            cx.set_reduce_motion(false);
+            MotionPolicy::resolve(MotionRole::Navigation, cx)
+        });
+        let theme = gpui_kit_theme::Theme::studio_light();
+        let geometry = geometry_at(&[(-80., -20., 80., 40.), (300., -20., 80., 40.)]);
+        let routed = |y| RoutedEdge {
+            edge: GraphEdge::new("node.0", "node.1").id("wire"),
+            route: OrthogonalRoute::new(vec![
+                point(0., 0.),
+                point(30., 0.),
+                point(30., y),
+                point(270., y),
+                point(270., 0.),
+                point(300., 0.),
+            ]),
+            status: RouteStatus::Clear,
+            tint: None,
+        };
+        let mut cache = RouteCache {
+            routes: Rc::new(vec![routed(100.)]),
+            ..Default::default()
+        };
+        let now = Instant::now();
+        cache.show(&geometry, &theme, now, policy, true);
+        cache.routes = Rc::new(vec![routed(20.)]);
+        cache.show(&geometry, &theme, now, policy, true);
+        let (shown, moving) = cache.show(
+            &geometry,
+            &theme,
+            now + std::time::Duration::from_millis(40),
+            policy,
+            true,
+        );
+        let y = shown[0].route.points()[2].y;
+        assert!(moving && y > 20. && y < 100.);
+        let view = Bounds::new(point(100., y - 0.1), size(80., 0.2));
+        assert_eq!(cache.index.query(view, 0.), vec![0]);
+        assert!(
+            !cache.routes[0].route.intersects(view, 0.),
+            "target-only index would miss this corridor"
+        );
+        let (settled, moving) = cache.show(&geometry, &theme, now, policy, false);
+        assert!(!moving);
+        assert_eq!(settled[0].route.points(), routed(20.).route.points());
+        assert!(cache.index.query(view, 0.).is_empty());
     }
 
     fn surface(width: f32, height: f32) -> Bounds<Pixels> {
@@ -4714,6 +5699,40 @@ mod tests {
     }
 
     #[test]
+    fn distant_connections_place_labels_on_visible_runs_without_covering_cards() {
+        let mut nodes = geometry_at(&[
+            (0., 140., 120., 80.),
+            (240., 90., 120., 180.),
+            (440., 40., 120., 280.),
+            (640., -10., 120., 380.),
+        ]);
+        nodes[0].id = "source".into();
+        let edge = GraphEdge::new("source", "offscreen").id("long-wire");
+        let routes = [RoutedEdge {
+            edge,
+            tint: None,
+            status: RouteStatus::SearchLimited,
+            route: OrthogonalRoute::new(vec![point(120., 180.), point(200_400., 180.)]),
+        }];
+        let surface = Bounds::new(point(-32., -24.), size(860., 440.));
+        let sizes = HashMap::from([("long-wire".into(), size(180., 20.))]);
+        let labels = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false, &[]);
+        let first = labels["long-wire"].shown;
+        let warnings =
+            place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false, &[first]);
+        let second = warnings["long-wire"].shown;
+        for label in [first, second] {
+            assert_eq!(outside_area(label, surface), 0.);
+            assert!(
+                nodes
+                    .iter()
+                    .all(|node| overlap_area(label, node.bounds, 0.) == 0.)
+            );
+        }
+        assert_eq!(overlap_area(first, second, 0.), 0.);
+    }
+
+    #[test]
     fn relationship_labels_choose_a_clear_route_seat_inside_the_surface() {
         let nodes = vec![
             NodeGeometry {
@@ -4742,6 +5761,7 @@ mod tests {
         let routes = [RoutedEdge {
             edge,
             tint: None,
+            status: RouteStatus::Clear,
             route: route_curved(
                 Anchor {
                     point: point(100.0, 100.0),
@@ -4755,7 +5775,7 @@ mod tests {
         }];
         let sizes = HashMap::from([(id.clone(), size(96.0, 20.0))]);
         let surface = Bounds::new(point(0.0, 0.0), size(400.0, 200.0));
-        let labels = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false);
+        let labels = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false, &[]);
         let label = labels.get(&id).expect("placed relationship").shown;
 
         assert!(
@@ -4817,6 +5837,7 @@ mod tests {
             routes.push(RoutedEdge {
                 edge,
                 tint: None,
+                status: RouteStatus::Clear,
                 route: route_curved(
                     Anchor {
                         point: point(start_x, 100.0 + drop),
@@ -4830,7 +5851,7 @@ mod tests {
             });
         }
         let surface = Bounds::new(point(-200.0, -200.0), size(800.0, 600.0));
-        let placed = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false);
+        let placed = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false, &[]);
         assert_eq!(placed.len(), 2, "both relationships were seated");
 
         let seats: Vec<Bounds<f32>> = routes
@@ -5251,6 +6272,57 @@ mod tests {
     }
 
     #[test]
+    fn retained_routes_share_hits_and_replace_exact_geometry_and_presentation() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let mut graph = NodeGraph::new("cache")
+            .node(
+                GraphNode::new("a", "A").port(GraphPort::output("out", "Out")),
+                0.,
+                0.,
+            )
+            .node(
+                GraphNode::new("b", "B").port(GraphPort::input("in", "In")),
+                450.,
+                110.,
+            )
+            .edge(GraphEdge::new("a", "b").ports("out", "in"));
+        let mut geometry = graph.geometry(&theme);
+        let mut cache = RouteCache::default();
+        let first = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert_eq!(first.len(), 1);
+        let hit = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert!(
+            Rc::ptr_eq(&first, &hit),
+            "cache hit retains route allocation"
+        );
+        graph.edges[0] = graph.edges[0].clone().selected(true);
+        let selected = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert!(!Rc::ptr_eq(&first, &selected));
+        assert!(selected[0].edge.is_selected());
+        assert!(!first[0].edge.is_selected(), "old snapshot is immutable");
+        assert_eq!(selected[0].route.points(), first[0].route.points());
+        geometry[0].ports[0].anchor.point.y += 17.;
+        let moved = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert!(!Rc::ptr_eq(&selected, &moved));
+        assert_eq!(
+            moved[0].route.points()[0].y,
+            first[0].route.points()[0].y + 17.
+        );
+        graph.routing = GraphRouting::Curves;
+        let curved = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert!(!Rc::ptr_eq(&moved, &curved));
+        assert_ne!(curved[0].route.points(), moved[0].route.points());
+        graph.edges.clear();
+        let empty = cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry);
+        assert!(empty.is_empty());
+        assert!(Rc::ptr_eq(
+            &empty,
+            &cache.resolve_inputs(&graph.edges, graph.routing, &theme, &geometry)
+        ));
+        assert_eq!(first.len(), 1, "removal never mutates a retained snapshot");
+    }
+
+    #[test]
     fn route_inputs_change_when_a_node_moves() {
         let theme = gpui_kit_theme::Theme::studio_dark();
         let placed = Placed::new(GraphNode::new("a", "A"), 0.0, 0.0);
@@ -5337,13 +6409,19 @@ mod tests {
     fn interaction_bounds_are_reused_until_node_geometry_changes() {
         let theme = gpui_kit_theme::Theme::studio_dark();
         let nodes = [Placed::new(GraphNode::new("a", "A"), 0.0, 0.0)];
+        let boxes = |placed: &Placed| {
+            (
+                placed.node.ident().semantic_id(),
+                placed.bounds(&theme, None),
+            )
+        };
         let mut cache = InteractionNodeCache::default();
-        let first = cache.update(&nodes, &theme);
-        let unchanged = cache.update(&nodes, &theme);
+        let first = cache.update(nodes.iter().map(boxes));
+        let unchanged = cache.update(nodes.iter().map(boxes));
         assert!(Rc::ptr_eq(&first, &unchanged));
 
         let moved = [Placed::new(GraphNode::new("a", "A"), 40.0, 0.0)];
-        let changed = cache.update(&moved, &theme);
+        let changed = cache.update(moved.iter().map(boxes));
         assert!(!Rc::ptr_eq(&first, &changed));
         assert_ne!(first[0].1, changed[0].1);
     }

@@ -2466,6 +2466,7 @@
           "series(series: impl IntoIterator<Item = RawSeries>) -> Self",
           "shared_series(series: Rc<Vec<RawSeries>>) -> Self",
           "animate(enabled: bool) -> Self",
+          "motion(motion: CartesianMotion) -> Self",
           "sampling(sampling: PathSampling) -> Self",
           "custom_marks(build: impl Fn(&RawSeries, &RawPoint) -> Option<CustomMark> + 'static) -> Self",
           "orientation(orientation: ChartOrientation) -> Self",
@@ -2475,7 +2476,11 @@
           "hidden(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
           "hovered(point: Option<ChartSelection>) -> Self",
           "selected(point: Option<ChartSelection>) -> Self",
+          "emphasized(series: Option<impl Into<SharedString>>) -> Self",
           "tooltip(mode: TooltipMode) -> Self",
+          "tooltip_content(build: impl Fn(&ChartTooltipData, &mut Window, &mut App) -> gpui::AnyElement + 'static) -> Self",
+          "floating_tooltip(visible: bool) -> Self",
+          "range(range: CartesianRange) -> Self",
           "references(references: impl IntoIterator<Item = ChartReference>) -> Self",
           "stale(reason: impl Into<SharedString>) -> Self",
           "height(height: f32) -> Self",
@@ -2885,7 +2890,8 @@
         ],
         "options": [
           "hidden(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
-          "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self"
+          "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self",
+          "on_emphasis(handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static) -> Self"
         ],
         "commands": [],
         "queries": [],
@@ -8317,6 +8323,9 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, scale: HeatColorScale, state: super::plot::PlotState<Vec<ContinuousHeatCell>>) -> Self"
         ],
         "options": [
+          "motion(enabled: bool) -> Self",
+          "animate(enabled: bool) -> Self",
+          "animation(spec: crate::motion::MotionSpec) -> Self",
           "rows(rows: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self",
           "columns(columns: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
@@ -12329,6 +12338,7 @@
           "state(state: GeoState) -> Self",
           "viewport(viewport: GeoViewport) -> Self",
           "selected(selected: Option<SharedString>) -> Self",
+          "animate(animate: bool) -> Self",
           "status_text(text: impl Into<SharedString>) -> Self",
           "on_event(handler: impl Fn(GeoEvent, &mut Window, &mut App) + 'static) -> Self"
         ],
@@ -23624,10 +23634,12 @@
           "new(ident: impl Into<Ident>) -> Self"
         ],
         "options": [
+          "animate_layout(animate: bool) -> Self",
           "node(node: GraphNode, x: f32, y: f32) -> Self",
           "placed(placed: Placed) -> Self",
           "edge(edge: GraphEdge) -> Self",
           "edges(edges: impl IntoIterator<Item = GraphEdge>) -> Self",
+          "source(source: GraphSource) -> Self",
           "band(band: GraphBand) -> Self",
           "bands(bands: impl IntoIterator<Item = GraphBand>) -> Self",
           "state(state: GraphState) -> Self",
@@ -25593,7 +25605,11 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<Vec<PlotMark>>) -> Self"
         ],
         "options": [
+          "selected(id: Option<SharedString>) -> Self",
+          "hit_test(picker: impl Fn(Point<f32>, Bounds<Pixels>) -> Option<SharedString> + 'static) -> Self",
+          "on_hover(handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static) -> Self",
           "paint(painter: impl Fn(PlotFrame, &mut Window, &mut App) + 'static) -> Self",
+          "labels(enabled: bool) -> Self",
           "current(mark_id: impl Into<SharedString>) -> Self",
           "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
         ],
@@ -28264,6 +28280,9 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<SankeyData>) -> Self"
         ],
         "options": [
+          "animate(enabled: bool) -> Self",
+          "animation(spec: crate::motion::MotionSpec) -> Self",
+          "selected(id: Option<SharedString>) -> Self",
           "labels(show: bool) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
           "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
@@ -30742,6 +30761,11 @@
           "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
           "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
           "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
+          "animate_viewport(animate: bool) -> Self",
+          "animate_layout(animate: bool) -> Self",
+          "layout_animation(spec: motion::MotionSpec) -> Self",
+          "selected_time(value: Option<[f64; 2]>) -> Result<Self, crate::interaction::range::RangeError>",
+          "on_time_selection(handler: impl Fn(crate::interaction::range::RangeEvent, &mut Window, &mut App) + 'static) -> Self",
           "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
           "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
           "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",
@@ -30828,6 +30852,13 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<SpecializedData>) -> Self"
         ],
         "options": [
+          "selected(id: Option<SharedString>) -> Self",
+          "motion(enabled: bool) -> Self",
+          "animate(enabled: bool) -> Self",
+          "animation(spec: crate::motion::MotionSpec) -> Self",
+          "labels(enabled: bool) -> Self",
+          "on_navigate(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+          "on_hover(handler: impl Fn(Option<SharedString>, &mut Window, &mut App) + 'static) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
           "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
         ],
@@ -38565,6 +38596,11 @@
           "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
           "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
           "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
+          "animate_viewport(animate: bool) -> Self",
+          "animate_layout(animate: bool) -> Self",
+          "layout_animation(spec: motion::MotionSpec) -> Self",
+          "selected_time(value: Option<[f64; 2]>) -> Result<Self, crate::interaction::range::RangeError>",
+          "on_time_selection(handler: impl Fn(crate::interaction::range::RangeEvent, &mut Window, &mut App) + 'static) -> Self",
           "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
           "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
           "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",

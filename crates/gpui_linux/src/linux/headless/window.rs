@@ -277,9 +277,29 @@ struct HeadlessAtlas(Mutex<HeadlessAtlasState>);
 struct HeadlessAtlasState {
     next_id: u32,
     tiles: HashMap<AtlasKey, AtlasTile>,
+    leases: gpui::AtlasLeaseRegistry,
 }
 
 impl PlatformAtlas for HeadlessAtlas {
+    fn resource_revision(&self) -> u64 {
+        self.0.lock().leases.revision()
+    }
+
+    fn retain_tiles(self: std::sync::Arc<Self>, tiles: &[AtlasTile]) -> Option<gpui::AtlasLease> {
+        let mut lock = self.0.lock();
+        let atlas = self.clone();
+        lock.leases.pin_tiles(tiles, move |epoch, keys| {
+            let mut lock = atlas.0.lock();
+            let removed = lock.leases.release(epoch, keys);
+            for key in removed {
+                lock.leases.defer_remove(&key);
+                if let Some(tile) = lock.tiles.remove(&key) {
+                    lock.leases.remove_tile(tile);
+                }
+            }
+        })
+    }
+
     fn get_or_insert_with<'a>(
         &self,
         key: &AtlasKey,
@@ -316,10 +336,17 @@ impl PlatformAtlas for HeadlessAtlas {
             },
         };
         state.tiles.insert(key.clone(), tile);
+        state.leases.insert_tile(key.clone(), tile);
         Ok(Some(tile))
     }
 
     fn remove(&self, key: &AtlasKey) {
-        self.0.lock().tiles.remove(key);
+        let mut lock = self.0.lock();
+        if lock.leases.defer_remove(key) {
+            return;
+        }
+        if let Some(tile) = lock.tiles.remove(key) {
+            lock.leases.remove_tile(tile);
+        }
     }
 }

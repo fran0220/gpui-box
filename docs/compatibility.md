@@ -21,6 +21,52 @@ history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
+`Window::paint_mark` / `record_paint_since` freeze a balanced, contiguous range
+while the subtree is live. Marks may be inside ancestor paint layers: capture
+owns balanced copies of their ordering scopes. The range must not close an
+inherited layer or leave a newly opened layer unclosed. Take the mark before
+painting the child and finish capture before leaving its ancestor scope.
+`paint_recording` and `paint_recording_with_offset`
+replay only owned GPUI paint, never element callbacks or input/focus/IME,
+accessibility, hosted-view, or Kit semantic registration. Current ambient
+uniform transform/opacity replaces its captured counterpart; local subtree
+effects remain frozen. Offsets are current-local logical pixels, transformed
+once. Capture-visible rectangular/rounded clipping moves with the picture and
+intersects the current ancestor clip; replay cannot expose clipped/culled
+content or reflow text. Zero/nonfinite capture opacity is refused.
+
+WGPU, Metal, Direct3D, and deterministic test atlases implement allocation
+leases. Image eviction waits only for referenced allocations; reset invalidates
+leases before resource identities can be reused. Both replay and renderer
+submission check validity, including reset after replay. Window, display scale,
+capture-frame identity and capture-time atlas revision are checked. Unsupported
+atlases refuse sprite capture. Glass, platform surfaces/views, and frames with
+deferred draws refuse capture rather than disappearing from a recording;
+position-dependent edge fade refuses replay. Callers drop recordings on
+completion, reinsertion, reduced motion, or refusal. This is not arbitrary
+content retirement: composited historical backdrop capture remains missing.
+
+Native atlas leases retain Send + Sync release callbacks so GPU submission
+completion may drop them on another thread. Wasm leases and callbacks remain
+thread-confined, matching browser GPU resources without an unsafe Send wrapper.
+The browser-gallery release build exercises this WGPU path; checking the Kit
+library for wasm alone does not. Native tests verify cross-thread final release.
+
+Capture bookkeeping does not rescan earlier cards. Marks copy only the active
+layer depth; capture validates/clones only its operation range. Atlas retention
+uses one expected-constant-time reverse-index lookup per sprite reference,
+with index memory proportional to allocated tiles. Referenced frame leases are
+found by a binary search in paint-order ranges, then only intersecting leases
+are visited. Path vertices, distinct clip ancestors, and the existing bounds
+tree reconstruction still cost work proportional to the captured content and
+its geometry; this is not a constant-cost snapshot or an arbitrary-rendering
+linear-time guarantee. Counter regressions cover 1,024 cards with an 8,192-op
+unrelated prefix and 3,072 tile references in both 64- and 8,192-tile atlases.
+
+Linux tests and dynamic offscreen frames cover text/card/image removal,
+reinsertion, ambient opacity/scale, clipping and reduced motion. macOS/Windows
+native execution remains pending; source changes are not platform acceptance.
+
 Inline deferred prepaint (including sticky content) preserves logical AccessKit
 ancestors, source child order, synthetic children, and ancestor-based active
 descendant focus independently of paint priority. Frame-local child
@@ -913,3 +959,50 @@ do not establish FPS, GPU performance or native presentation. Linux headless
 catalog and full gate checks are integration requirements; macOS Metal and
 Windows WARP remain their separately executed platform lanes. No baseline,
 shader, renderer, package authority or frozen historical receipt is changed.
+
+### Measured descriptive leaves are not interactive controls
+
+`gpui_kit_semantics::MeasuredLeafBatch` publishes many caller-measured Image or
+Text leaves through one layout element and a real native Group. It does not
+accept general `NodeSpec`, focus, actions, ranges or cross-node relationships.
+Diagnostic parentage is explicit and does not change native ancestry. Native
+leaf ids derive from the mounted batch identity and stable caller business ids,
+not list order. Label/description/value redaction and diagnostic selection are
+preserved; Image/Text native selection remains unset, as for ordinary semantics.
+
+The current-prepaint callback supplies untransformed logical window bounds and
+is skipped when both outputs are inactive. Diagnostics retain the existing
+transformed-logical, unclipped convention. Native publication uses the existing
+physical-pixel transform and conservative ancestor clips, including zero-area
+fully clipped leaves while the owner is published. The caller owns actual shape
+visibility, holes and viewport intersection. No per-leaf layout snapping is
+introduced; fractional caller bounds can differ from old Div/Taffy rounding.
+No hitboxes or input handlers are installed by the batch.
+
+`Window::debug_a11y_tree_json` additionally exposes committed physical `bounds`
+as `{x0,y0,x1,y1}` when present. This is additive inspection data, not a native
+behavior change. See [measured-semantic-leaves.md](measured-semantic-leaves.md)
+for usage, mounted tests and CPU evidence. Linux TestPlatform checks are not
+macOS/Windows screen-reader, device-touch or native GPU certification.
+
+### Virtualized row layout motion uses framework placement
+
+`Window::with_placed_element_offset` declares the actual placement of a
+root-laid-out subtree separately from its scroll offset. `ambient_element_offset`
+excludes that layout contribution. UniformList supplies its own measured slot;
+FLIP no longer mistakes virtual-row reorder for ambient scrolling. Existing
+offset APIs and paint, clip, hit and native bounds remain unchanged. Ordinary
+nonvirtual FLIP coordinates are unchanged outside declared placement scopes.
+
+TraceView and SpanTimeline animate surviving mounted hierarchy rows by default.
+`animate_layout(false)` settles them; `layout_animation` changes their timing
+independently of time-viewport motion. Caller collapse/selection remains
+authoritative; removed rows immediately lose live authority. Newly revealed rows
+wait for survivors to settle before mounting in place, so final-slot content
+cannot overlap moving rows. Waiting rows have no handlers or semantic targets.
+Caller selection changes, scrolling, disabled motion and reduced motion settle
+immediately. Initial mounting and ordinary scrolling do not delay publication.
+There is no recorded Trace row exit fade. Variable-height
+List and other custom root-placement adapters do not yet declare content-space
+placement; virtual reflow support for those adapters is not claimed. Linux
+mounted tests do not replace macOS/Windows native acceptance.

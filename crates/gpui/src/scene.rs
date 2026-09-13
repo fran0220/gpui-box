@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, DevicePixels, Edges, Hsla,
-    Pixels, Point, Radians, Rgba, ScaledPixels, Size, bounds_tree::BoundsTree,
+    PaintRecordingError, Pixels, Point, Radians, Rgba, ScaledPixels, Size, bounds_tree::BoundsTree,
     luminance_probe_slot, point, white,
 };
 use std::{
@@ -22,6 +22,15 @@ pub type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;
 
 #[expect(missing_docs)]
 pub type DrawOrder = u32;
+
+// Unlike public opacity(), normalization may increase alpha when the current
+// ancestor is more opaque than the captured ancestor. Do not clamp the ratio.
+fn scale_recorded_background_alpha(background: &mut Background, ratio: f32) {
+    background.solid.a *= ratio;
+    for stop in &mut background.colors {
+        stop.color.a *= ratio;
+    }
+}
 
 /// A boolean stored as a `u32` so that GPU-facing structs contain no
 /// compiler-inserted padding bytes, which would be undefined behavior to
@@ -41,13 +50,17 @@ impl From<bool> for PaddedBool32 {
 #[expect(missing_docs)]
 pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
+    pub(crate) paint_epoch: std::sync::Arc<()>,
+    pub(crate) paint_leases: Vec<(Range<usize>, crate::AtlasLease)>,
     /// Rounded subtree geometry, separate from rectangular culling and optical
     /// capture bounds. Indices belong to this scene and expire on `clear`.
     pub clip_nodes: crate::ClipNodes,
     active_clip: crate::ClipId,
     visual_transform: TransformationMatrix,
     primitive_bounds: BoundsTree<ScaledPixels>,
-    layer_stack: Vec<DrawOrder>,
+    layer_stack: Vec<(DrawOrder, Bounds<ScaledPixels>)>,
+    #[cfg(test)]
+    recording_work: std::cell::Cell<usize>,
     pub shadows: Vec<Shadow>,
     pub quads: Vec<Quad>,
     pub paths: Vec<Path<ScaledPixels>>,
@@ -65,6 +78,8 @@ pub struct Scene {
 impl Scene {
     pub fn clear(&mut self) {
         self.paint_operations.clear();
+        self.paint_epoch = std::sync::Arc::new(());
+        self.paint_leases.clear();
         self.clip_nodes.clear();
         self.active_clip = crate::ClipId::NONE;
         self.visual_transform = TransformationMatrix::unit();
@@ -109,7 +124,7 @@ impl Scene {
             self.visual_transform.transform_bounds(bounds)
         };
         let order = self.primitive_bounds.insert(bounds);
-        self.layer_stack.push(order);
+        self.layer_stack.push((order, bounds));
         self.paint_operations
             .push(PaintOperation::StartLayer(bounds));
     }
@@ -117,6 +132,17 @@ impl Scene {
     pub fn pop_layer(&mut self) {
         self.layer_stack.pop();
         self.paint_operations.push(PaintOperation::EndLayer);
+    }
+
+    pub(crate) fn recording_layers(&self) -> Vec<Bounds<ScaledPixels>> {
+        self.layer_stack
+            .iter()
+            .map(|(_, bounds)| {
+                #[cfg(test)]
+                self.recording_work.set(self.recording_work.get() + 1);
+                *bounds
+            })
+            .collect()
     }
 
     pub fn insert_backdrop_glass(&mut self, glass: BackdropGlass) {
@@ -190,7 +216,7 @@ impl Scene {
         glass.order = self
             .layer_stack
             .last()
-            .copied()
+            .map(|(order, _)| *order)
             .unwrap_or_else(|| self.primitive_bounds.insert(clipped_bounds));
         if self.backdrop_glass.len() < MAX_BACKDROP_GLASS_SURFACES_PER_FRAME {
             self.backdrop_glass.push(glass);
@@ -233,7 +259,7 @@ impl Scene {
         let order = self
             .layer_stack
             .last()
-            .copied()
+            .map(|(order, _)| *order)
             .unwrap_or_else(|| self.primitive_bounds.insert(clipped_bounds));
         match &mut primitive {
             Primitive::Shadow(shadow) => {
@@ -275,10 +301,16 @@ impl Scene {
     }
 
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
+        let start = self.len();
+        let source_range = range.clone();
         let previous_clip = self.active_clip;
         let previous_transform = self.replace_visual_transform(TransformationMatrix::unit());
         let mut remapped = collections::FxHashMap::default();
         for operation in &prev_scene.paint_operations[range] {
+            #[cfg(test)]
+            prev_scene
+                .recording_work
+                .set(prev_scene.recording_work.get() + 1);
             let old_clip = match operation {
                 PaintOperation::Primitive(primitive) => primitive.clip_id(),
                 PaintOperation::BackdropGlass { glass, .. } => glass.clip_id,
@@ -298,6 +330,184 @@ impl Scene {
         }
         self.active_clip = previous_clip;
         self.visual_transform = previous_transform;
+        self.paint_leases.extend(
+            prev_scene
+                .leases_for_range(&source_range)
+                .map(|(r, lease)| {
+                    (
+                        (start + r.start.max(source_range.start) - source_range.start)
+                            ..(start + r.end.min(source_range.end) - source_range.start),
+                        lease.clone(),
+                    )
+                }),
+        );
+    }
+
+    /// Renderer submission must refuse a scene whose frozen resources reset
+    /// after replay. No renderer may resolve its stale atlas coordinates.
+    pub fn paint_resources_valid(&self) -> bool {
+        self.paint_leases.iter().all(|(_, lease)| lease.is_valid())
+    }
+
+    // Ranges are appended in paint order. They are disjoint or identical
+    // (several leases may own one replay), so both starts and ends are sorted.
+    fn leases_for_range(
+        &self,
+        range: &Range<usize>,
+    ) -> impl Iterator<Item = &(Range<usize>, crate::AtlasLease)> {
+        let start = self
+            .paint_leases
+            .partition_point(|(r, _)| r.end <= range.start);
+        self.paint_leases[start..]
+            .iter()
+            .take_while(move |(r, _)| r.start < range.end)
+    }
+
+    pub(crate) fn freeze_paint(
+        &self,
+        range: Range<usize>,
+        inherited_layers: &[Bounds<ScaledPixels>],
+        atlas: std::sync::Arc<dyn crate::PlatformAtlas>,
+    ) -> Result<Scene, PaintRecordingError> {
+        let operations = self
+            .paint_operations
+            .get(range.clone())
+            .ok_or(PaintRecordingError::StaleMark)?;
+        let mut depth = 0usize;
+        let mut tiles = Vec::new();
+        for operation in operations {
+            #[cfg(test)]
+            self.recording_work.set(self.recording_work.get() + 1);
+            match operation {
+                PaintOperation::BackdropGlass { .. } => {
+                    return Err(PaintRecordingError::BackdropGlass);
+                }
+                PaintOperation::Primitive(Primitive::Surface(_)) => {
+                    return Err(PaintRecordingError::Surface);
+                }
+                PaintOperation::Primitive(Primitive::MonochromeSprite(p)) => tiles.push(p.tile),
+                PaintOperation::Primitive(Primitive::SubpixelSprite(p)) => tiles.push(p.tile),
+                PaintOperation::Primitive(Primitive::PolychromeSprite(p)) => tiles.push(p.tile),
+                PaintOperation::StartLayer(_) => depth += 1,
+                PaintOperation::EndLayer => {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or(PaintRecordingError::UnbalancedLayers)?
+                }
+                _ => {}
+            }
+        }
+        if depth != 0 {
+            return Err(PaintRecordingError::UnbalancedLayers);
+        }
+        if !self
+            .leases_for_range(&range)
+            .all(|(_, lease)| lease.is_valid())
+        {
+            return Err(PaintRecordingError::ResourceReset);
+        }
+        let lease = if tiles.is_empty() {
+            None
+        } else {
+            Some(
+                atlas
+                    .retain_tiles(&tiles)
+                    .ok_or(PaintRecordingError::AtlasUnsupported)?,
+            )
+        };
+        let mut frozen = Scene::default();
+        for bounds in inherited_layers {
+            frozen.push_layer(*bounds);
+        }
+        frozen.replay(range, self);
+        for _ in inherited_layers {
+            frozen.pop_layer();
+        }
+        frozen.paint_leases.clear();
+        if let Some(lease) = lease {
+            frozen.paint_leases.push((0..frozen.len(), lease));
+        }
+        Ok(frozen)
+    }
+
+    pub(crate) fn replay_frozen(
+        &mut self,
+        source: &Scene,
+        mask: ContentMask<ScaledPixels>,
+        opacity: f32,
+    ) -> Result<(), PaintRecordingError> {
+        if !source.paint_resources_valid() {
+            return Err(PaintRecordingError::ResourceReset);
+        }
+        let start = self.len();
+        let previous_clip = self.active_clip;
+        let transform = self.replace_visual_transform(TransformationMatrix::unit());
+        let mut remapped = collections::FxHashMap::default();
+        for operation in &source.paint_operations {
+            match operation {
+                PaintOperation::Primitive(primitive) => {
+                    let clip = self.clip_nodes.replay_transformed(
+                        primitive.clip_id(),
+                        &source.clip_nodes,
+                        previous_clip,
+                        transform,
+                        &mut remapped,
+                    );
+                    let mut primitive = primitive.clone();
+                    crate::visual_transform::transform_primitive(&mut primitive, transform);
+                    let content_mask = match &mut primitive {
+                        Primitive::Shadow(p) => {
+                            p.color.a *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::Quad(p) => {
+                            scale_recorded_background_alpha(&mut p.background, opacity);
+                            p.border_color.a *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::Path(p) => {
+                            scale_recorded_background_alpha(&mut p.color, opacity);
+                            &mut p.content_mask
+                        }
+                        Primitive::Underline(p) => {
+                            p.color.a *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::MonochromeSprite(p) => {
+                            p.color.a *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::SubpixelSprite(p) => {
+                            p.color.a *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::PolychromeSprite(p) => {
+                            p.opacity *= opacity;
+                            &mut p.content_mask
+                        }
+                        Primitive::Surface(_) => unreachable!("capture rejects surfaces"),
+                    };
+                    content_mask.bounds = content_mask.bounds.intersect(&mask.bounds);
+                    self.active_clip = clip;
+                    self.insert_primitive(primitive);
+                }
+                PaintOperation::StartLayer(bounds) => {
+                    self.push_layer(transform.transform_bounds(*bounds))
+                }
+                PaintOperation::EndLayer => self.pop_layer(),
+                PaintOperation::BackdropGlass { .. } => unreachable!("capture rejects glass"),
+            }
+        }
+        self.active_clip = previous_clip;
+        self.visual_transform = transform;
+        let end = self.len();
+        self.paint_leases.extend(
+            source
+                .paint_leases
+                .iter()
+                .map(|(_, lease)| (start..end, lease.clone())),
+        );
+        Ok(())
     }
 
     pub fn finish(&mut self) {
@@ -3234,5 +3444,75 @@ impl PathVertex<Pixels> {
             st_position: self.st_position,
             content_mask: self.content_mask.scale(factor),
         }
+    }
+}
+
+#[cfg(test)]
+mod recording_cost_tests {
+    use super::*;
+
+    #[test]
+    fn recording_lease_search_preserves_duplicate_ranges_and_half_open_boundaries() {
+        let mut registry = crate::AtlasLeaseRegistry::default();
+        let lease = registry.pin(Vec::new(), |_, _| {});
+        let mut scene = Scene::default();
+        for range in [1..5, 1..5, 5..8, 8..9, 12..20] {
+            scene.paint_leases.push((range, lease.clone()));
+        }
+        let ranges = |query| {
+            scene
+                .leases_for_range(&query)
+                .map(|(range, _)| range.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ranges(4..13), vec![1..5, 1..5, 5..8, 8..9, 12..20]);
+        assert_eq!(ranges(5..8), vec![5..8]);
+        assert_eq!(ranges(8..9), vec![8..9]);
+        assert!(ranges(9..12).is_empty());
+        assert!(ranges(20..21).is_empty());
+    }
+
+    #[test]
+    fn multi_card_capture_visits_only_active_layers_and_card_operations() {
+        fn capture(cards: usize, prefix: usize) -> usize {
+            let mut scene = Scene::default();
+            let bounds = Bounds::new(
+                point(ScaledPixels(0.), ScaledPixels(0.)),
+                crate::size(ScaledPixels(100.), ScaledPixels(100.)),
+            );
+            let quad = Quad {
+                bounds,
+                content_mask: ContentMask { bounds },
+                background: white().into(),
+                ..Default::default()
+            };
+            for _ in 0..prefix {
+                scene.insert_primitive(quad);
+            }
+            scene.push_layer(bounds);
+            scene.push_layer(bounds);
+            let atlas = std::sync::Arc::new(crate::TestAtlas::new());
+            for _ in 0..cards {
+                let layers = scene.recording_layers();
+                let start = scene.len();
+                scene.push_layer(bounds);
+                scene.insert_primitive(quad);
+                scene.insert_primitive(quad);
+                scene.pop_layer();
+                let recording = scene
+                    .freeze_paint(start..scene.len(), &layers, atlas.clone())
+                    .expect("balanced card under two inherited layers");
+                assert_eq!(recording.quads.len(), 2);
+                assert_eq!(recording.len(), 8);
+            }
+            scene.recording_work.get()
+        }
+        assert_eq!(capture(64, 0), 640);
+        assert_eq!(capture(1024, 0), 10240);
+        assert_eq!(
+            capture(1024, 8192),
+            10240,
+            "an unrelated growing paint prefix must add no recording visits"
+        );
     }
 }

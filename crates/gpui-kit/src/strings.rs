@@ -546,6 +546,21 @@ string_keys! {
     TraceRunning => "trace.running", "Running";
     TraceSucceeded => "trace.succeeded", "Succeeded";
     TraceFailed => "trace.failed", "Failed";
+    TimeUtcValue => "time.utc-value", "{0} ms UTC";
+    TimeSelection => "time.selection", "Time selection";
+    RangeSelectionStart => "range.selection-start", "Selection start";
+    RangeSelectionEnd => "range.selection-end", "Selection end";
+    RangeSelectionEmpty => "range.selection-empty", "No selected range";
+    RangeSelectionRange => "range.selection-range", "Selected range: {0} – {1}";
+    RangeSelectionPreview => "range.selection-preview", "Selection preview: {0} – {1}";
+    TimeSelectionEmpty => "time.selection-empty", "No selected time";
+    TimeSelectionRange => "time.selection-range", "Selected time: {0} – {1}";
+    TimeSelectionPreview => "time.selection-preview", "Time selection preview: {0} – {1}";
+    RangeSelectionInstructions => "range.selection-instructions", "Drag to create, shift-drag to replace, drag inside to move, or drag a handle to resize";
+    TraceInterval => "trace.interval", "Start: {0}; End: {1}";
+    TraceNormalizedInterval => "trace.normalized-interval", "Start: {0}; End: {1} (normalized)";
+    TraceReadout => "trace.readout", "{0} · {1}\n{2}";
+    TraceDuration => "trace.duration", "Duration: {0}";
     HeatmapLess => "heatmap.less", "Less";
     HeatmapMore => "heatmap.more", "More";
     HeatmapMissing => "heatmap.missing", "Not observed";
@@ -580,6 +595,9 @@ string_keys! {
     GeographyDuplicateIdentity => "geography.duplicate-identity", "Feature and point identities must be nonempty and unique";
     GeographyInvalidValue => "geography.invalid-value", "Values must be finite and inside the declared increasing color domain";
     GeographyInvalidViewport => "geography.invalid-viewport", "Viewport needs finite unit-world center and zoom in 1..=64";
+    GeographyInvalidGeoJson => "geography.invalid-geojson", "Unsupported GeoJSON: require identified 2D WGS84 Polygon, MultiPolygon or Point Features with object or null properties";
+    GeographyDocumentLimit => "geography.document-limit", "GeoJSON exceeds the 32 MiB document limit";
+    GeographyInvalidSimplification => "geography.invalid-simplification", "Simplification tolerance must be finite in 0..=0.01 projected unit-world";
     ColorHue => "color.hue", "Hue";
     ColorSaturation => "color.saturation", "Saturation and brightness";
     ColorAlpha => "color.alpha", "Opacity";
@@ -592,6 +610,13 @@ string_keys! {
     GraphFit => "graph.fit", "Fit to view";
     GraphSnap => "graph.snap", "Snap to grid";
     GraphArrange => "graph.arrange", "Arrange";
+    GraphRouteObstructed => "graph.route-obstructed", "No obstacle-free route found";
+    GraphRouteSearchLimited => "graph.route-search-limited", "Routing search limit reached";
+    GraphEdgeDescription => "graph.edge-description", "{0}; state {1}";
+    GraphEdgeIdle => "graph.edge-idle", "idle";
+    GraphEdgeActive => "graph.edge-active", "active";
+    GraphEdgeSucceeded => "graph.edge-succeeded", "succeeded";
+    GraphEdgeFailed => "graph.edge-failed", "failed";
     PromptEmpty => "prompt.empty", "No template";
     PromptUnavailable => "prompt.unavailable", "Template unavailable";
     // A host that refused and a request that failed are two different facts,

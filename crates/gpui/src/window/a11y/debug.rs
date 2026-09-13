@@ -213,6 +213,15 @@ fn node_to_json(
 
     let mut map = serde_json::Map::new();
     map.insert("accesskit_id".into(), json!(id.0.to_string()));
+    if let Some(bounds) = node.bounds() {
+        map.insert(
+            "bounds".into(),
+            json!({
+                "x0": bounds.x0, "y0": bounds.y0,
+                "x1": bounds.x1, "y1": bounds.y1,
+            }),
+        );
+    }
 
     let children: Vec<String> = node
         .children()
@@ -462,4 +471,33 @@ fn ephemeral_id(mut index: usize) -> String {
     }
     bytes.reverse();
     String::from_utf8(bytes).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exported_bounds_are_the_committed_physical_rectangle() {
+        let mut node = accesskit::Node::new(accesskit::Role::Image);
+        let ids = FxHashMap::default();
+        let provenance = NodeProvenance::default();
+        assert!(
+            node_to_json(NodeId(41), &node, &ids, &provenance)
+                .get("bounds")
+                .is_none()
+        );
+        node.set_bounds(accesskit::Rect {
+            x0: -3.25,
+            y0: 7.5,
+            x1: 19.75,
+            y1: 11.,
+        });
+        let json = node_to_json(NodeId(41), &node, &ids, &provenance);
+        assert_eq!(json["accesskit_id"], "41");
+        assert_eq!(
+            json["bounds"],
+            serde_json::json!({"x0": -3.25, "y0": 7.5, "x1": 19.75, "y1": 11.})
+        );
+    }
 }
