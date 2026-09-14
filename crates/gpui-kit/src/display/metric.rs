@@ -323,6 +323,9 @@ impl RenderOnce for MetricCard {
             .card_surface(&theme, CardVariant::Filled)
             .child(
                 div()
+                    .w_full()
+                    .min_w_0()
+                    .whitespace_normal()
                     .type_scale(&theme, TypeScale::Caption)
                     .text_tone(&theme, TextTone::Muted)
                     .child(self.label.clone()),
@@ -334,6 +337,7 @@ impl RenderOnce for MetricCard {
                     .column()
                     .justify_center()
                     .w_full()
+                    .min_w_0()
                     .min_h(px(BODY_HEIGHT))
                     .child(body),
             ))
@@ -364,6 +368,8 @@ fn marked_empty(
     let mark_ident = ident.child("mark");
     div()
         .id(mark_ident.element_id())
+        .w_full()
+        .min_w_0()
         .child(empty)
         .tip(mark_ident, label)
         .into_any_element()
@@ -403,15 +409,21 @@ fn reading_body(
     div()
         .column()
         .w_full()
+        .min_w_0()
         .gap_token(theme, Space::Xs)
         .child(
             div()
                 .row()
+                .w_full()
+                .min_w_0()
                 .items_baseline()
                 .justify_between()
                 .gap_token(theme, Space::Sm)
                 .child(
                     div()
+                        .flex_1()
+                        .min_w_0()
+                        .whitespace_normal()
                         .type_scale(theme, TypeScale::Title)
                         .text_tone(theme, TextTone::Primary)
                         .child(reading.value.clone()),
@@ -424,12 +436,14 @@ fn reading_body(
         .children(stale.map(|reason| {
             div()
                 .row()
+                .w_full()
+                .min_w_0()
                 .items_center()
                 .gap_token(theme, Space::Xs)
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(theme.colors.warning)
                 .child(StatusDot::new(Tone::Warning))
-                .child(reason)
+                .child(div().flex_1().min_w_0().whitespace_normal().child(reason))
         }))
         .into_any_element()
 }

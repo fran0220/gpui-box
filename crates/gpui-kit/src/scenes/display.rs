@@ -1054,53 +1054,80 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn metric_card(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
-        .w(px(420.0))
+        .w(px(760.0))
         .child(caption(
             &theme,
             "a KPI keeps the last verified reading when a refresh fails",
         ))
-        .child(MetricCard::new(
-            "scene.metric.ready",
-            "Tokens",
-            MetricState::Ready(
-                MetricReading::new("12.4k")
-                    .delta("+8%", Tone::Success)
-                    .trend([
-                        SparklinePoint::new(0.0, 0.30),
-                        SparklinePoint::new(0.35, 0.55),
-                        SparklinePoint::new(0.70, 0.48),
-                        SparklinePoint::new(1.0, 0.72),
-                    ]),
-            ),
-        ))
-        .child(MetricCard::new(
-            "scene.metric.loading",
-            "Tokens",
-            MetricState::Loading,
-        ))
-        .child(MetricCard::new(
-            "scene.metric.empty",
-            "Tokens",
-            MetricState::Empty,
-        ))
-        .child(MetricCard::new(
-            "scene.metric.unavailable",
-            "Tokens",
-            MetricState::Unavailable("The meter host is offline.".into()),
-        ))
-        .child(MetricCard::new(
-            "scene.metric.error",
-            "Tokens",
-            MetricState::Error("The meter returned an invalid reading.".into()),
-        ))
-        .child(MetricCard::new(
-            "scene.metric.stale",
-            "Tokens",
-            MetricState::Stale {
-                reading: MetricReading::new("12.4k").delta("+8%", Tone::Warning),
-                reason: "Refresh failed; showing last verified reading".into(),
-            },
-        ))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div()
+                        .column()
+                        .w(px(240.0))
+                        .gap_token(&theme, Space::Md)
+                        .child(MetricCard::new(
+                            "scene.metric.ready",
+                            "Verified session throughput across all connected regions",
+                            MetricState::Ready(
+                                MetricReading::new("sessionthroughputwithoutabreak12.4k")
+                                    .delta("+8%", Tone::Success)
+                                    .trend([
+                                        SparklinePoint::new(0.0, 0.30),
+                                        SparklinePoint::new(0.35, 0.55),
+                                        SparklinePoint::new(0.70, 0.48),
+                                        SparklinePoint::new(1.0, 0.72),
+                                    ]),
+                            ),
+                        ))
+                        .child(MetricCard::new(
+                            "scene.metric.loading",
+                            "Tokens",
+                            MetricState::Loading,
+                        )),
+                )
+                .child(
+                    div()
+                        .column()
+                        .w(px(240.0))
+                        .gap_token(&theme, Space::Md)
+                        .child(MetricCard::new(
+                            "scene.metric.empty",
+                            "Tokens",
+                            MetricState::Empty,
+                        ))
+                        .child(MetricCard::new(
+                            "scene.metric.unavailable",
+                            "Tokens",
+                            MetricState::Unavailable(
+                                "gatewayadminofflinewithoutabreakortruncationmarker".into(),
+                            ),
+                        )),
+                )
+                .child(
+                    div()
+                        .column()
+                        .w(px(240.0))
+                        .gap_token(&theme, Space::Md)
+                        .child(MetricCard::new(
+                            "scene.metric.error",
+                            "Tokens",
+                            MetricState::Error("计量服务返回了无效读数，最后确认的数值会继续保留；接続が回復するまで最後に確認された値は保持されます。计量服务返回了无效读数，最后确认的数值会继续保留。".into()),
+                        ))
+                        .child(MetricCard::new(
+                            "scene.metric.stale",
+                            "Tokens",
+                            MetricState::Stale {
+                                reading: MetricReading::new("12.4k")
+                                    .delta("+8%", Tone::Warning),
+                                reason: "Gateway refresh failed while offline; showing the last verified reading until a connection is restored".into(),
+                            },
+                        )),
+                ),
+        )
         .into_any_element()
 }
 
