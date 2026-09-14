@@ -6,7 +6,7 @@
 //! keeps the position across rebuilds without making every caller own a GPUI
 //! handle, and it lets a surface built on top of another one move it by name.
 
-use std::{collections::HashMap, ops::Range, time::Duration};
+use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 use crate::foundation::{Ident, window_state};
 use crate::motion::{Glide, MotionPolicy, MotionRole};
@@ -23,6 +23,57 @@ const FRAME: Duration = Duration::from_millis(16);
 /// its estimated height and then jumping to its real one.
 const OVERDRAW: f32 = 240.0;
 
+/// Immutable row identities and geometry revisions shared by Flow and List.
+/// Construct once when order or geometry changes, then clone into each render.
+/// Clones retain allocation identity, allowing unchanged reconciliation in O(1).
+/// A fresh snapshot still reconciles by key, preserving measurements and anchors.
+#[derive(Debug, Clone)]
+pub struct RowSnapshot(Arc<RowSnapshotData>);
+
+#[derive(Debug)]
+struct RowSnapshotData {
+    keys: Arc<[SharedString]>,
+    revisions: Vec<u64>,
+}
+
+impl RowSnapshot {
+    /// Validates unique stable keys and exactly one geometry revision per key.
+    /// Revisions need not be monotonic; use zero for unchanged geometry.
+    /// Panics on duplicate keys or mismatched lengths, even before mounting.
+    pub fn new(
+        keys: impl IntoIterator<Item = impl Into<SharedString>>,
+        revisions: Vec<u64>,
+    ) -> Self {
+        let keys: Arc<[SharedString]> = keys.into_iter().map(Into::into).collect();
+        assert_eq!(
+            keys.len(),
+            revisions.len(),
+            "one revision is required per row"
+        );
+        let unique: std::collections::HashSet<_> = keys.iter().collect();
+        assert_eq!(unique.len(), keys.len(), "row keys must be unique");
+        Self(Arc::new(RowSnapshotData { keys, revisions }))
+    }
+
+    /// Stable identities in render order.
+    pub fn keys(&self) -> &[SharedString] {
+        &self.0.keys
+    }
+
+    /// Geometry revisions in the same order as the keys.
+    pub fn revisions(&self) -> &[u64] {
+        &self.0.revisions
+    }
+
+    pub(crate) fn shared_keys(&self) -> Arc<[SharedString]> {
+        self.0.keys.clone()
+    }
+
+    fn same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// What one variable-height surface has learned about itself.
 struct Flow {
     state: ListState,
@@ -31,6 +82,7 @@ struct Flow {
     /// a run of anonymous names it can still compare the length of.
     keys: Vec<SharedString>,
     revisions: Vec<u64>,
+    snapshot: Option<RowSnapshot>,
 }
 
 /// How a surface describes the rows it is about to draw.
@@ -45,6 +97,7 @@ struct Flow {
 pub(crate) enum Rows<'a> {
     Counted(usize),
     Keyed(&'a [SharedString]),
+    Snapshot(&'a RowSnapshot),
 }
 
 impl Rows<'_> {
@@ -52,6 +105,7 @@ impl Rows<'_> {
         match self {
             Self::Counted(count) => *count,
             Self::Keyed(keys) => keys.len(),
+            Self::Snapshot(snapshot) => snapshot.keys().len(),
         }
     }
 }
@@ -73,6 +127,7 @@ pub(crate) fn scroll_handle(
 struct Uniform {
     keys: Vec<SharedString>,
     height: Pixels,
+    snapshot: Option<RowSnapshot>,
 }
 
 /// Reconcile a fixed-height viewport through the same anchor policy as Flow.
@@ -80,21 +135,35 @@ struct Uniform {
 /// business keys and the caller's fixed row height remain Kit-owned inputs.
 pub(crate) fn reconcile_uniform(
     ident: &Ident,
-    keys: &[SharedString],
+    rows: Rows<'_>,
     height: Pixels,
     window: &Window,
     cx: &mut App,
 ) {
+    let (keys, snapshot) = match rows {
+        Rows::Keyed(keys) => (keys, None),
+        Rows::Snapshot(snapshot) => (snapshot.keys(), Some(snapshot)),
+        Rows::Counted(_) => return,
+    };
     let handle = scroll_handle(ident, window, cx);
     window_state::with_key(
         &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
         |known: &mut Option<Uniform>| {
-            if known
-                .as_ref()
-                .is_some_and(|previous| previous.keys == keys && previous.height == height)
+            if known.as_ref().is_some_and(|previous| {
+                previous.height == height
+                    && snapshot
+                        .zip(previous.snapshot.as_ref())
+                        .is_some_and(|(a, b)| a.same(b))
+            }) {
+                return;
+            }
+            if let Some(previous) = known.as_mut()
+                && previous.keys == keys
+                && previous.height == height
             {
+                previous.snapshot = snapshot.cloned();
                 return;
             }
             let unique: std::collections::HashSet<_> = keys.iter().collect();
@@ -103,6 +172,7 @@ pub(crate) fn reconcile_uniform(
                 *known = Some(Uniform {
                     keys: keys.to_vec(),
                     height,
+                    snapshot: snapshot.cloned(),
                 });
                 return;
             };
@@ -135,6 +205,7 @@ pub(crate) fn reconcile_uniform(
             }
             previous.keys = keys.to_vec();
             previous.height = height;
+            previous.snapshot = snapshot.cloned();
         },
     );
 }
@@ -170,8 +241,23 @@ pub(crate) fn list_state(
                     .with_uniform_item_height(estimate),
                 keys: anonymous(count),
                 revisions: vec![0; count],
+                snapshot: None,
             });
 
+            let snapshot = match rows {
+                Rows::Snapshot(snapshot) => Some(snapshot),
+                _ => None,
+            };
+            if snapshot
+                .zip(flow.snapshot.as_ref())
+                .is_some_and(|(a, b)| a.same(b))
+            {
+                return flow.state.clone();
+            }
+            let (rows, revisions) = match snapshot {
+                Some(snapshot) => (Rows::Keyed(snapshot.keys()), Some(snapshot.revisions())),
+                None => (rows, revisions),
+            };
             match rows {
                 Rows::Keyed(keys) => {
                     let revisions = revisions.map_or_else(
@@ -221,7 +307,9 @@ pub(crate) fn list_state(
                         flow.revisions = vec![0; count];
                     }
                 }
+                Rows::Snapshot(_) => unreachable!(),
             }
+            flow.snapshot = snapshot.cloned();
             flow.state.clone()
         },
     )
@@ -436,6 +524,12 @@ pub struct Viewed {
 /// not been laid out as a variable-height list, which is one frame at most and
 /// is not the same answer as "the top", so a caller can tell "not yet" from
 /// "row zero".
+///
+/// Sample before constructing the Flow/List, or from an event outside its
+/// layout, and capture the result if row rendering needs it. Do not call from
+/// that surface's row-render callback: layout already holds the measured
+/// list state mutably, so a reentrant viewport query panics. `RowSnapshot`
+/// accessors only read immutable caller data and have no such restriction.
 pub fn viewed_rows(ident: &Ident, window: &Window, cx: &App) -> Option<Viewed> {
     let state = flow_state(ident, window.window_handle().window_id(), cx)?;
     Some(Viewed {
@@ -506,6 +600,86 @@ mod tests {
         names.iter().map(|name| SharedString::from(*name)).collect()
     }
 
+    #[test]
+    #[should_panic(expected = "row keys must be unique")]
+    fn snapshot_rejects_duplicate_keys() {
+        RowSnapshot::new(["a", "a"], vec![0, 1]);
+    }
+
+    #[test]
+    #[should_panic(expected = "one revision is required per row")]
+    fn snapshot_rejects_incomplete_revisions() {
+        RowSnapshot::new(["a", "b"], vec![0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "one key is required per row")]
+    fn flow_rejects_snapshot_count_mismatch() {
+        use gpui::IntoElement;
+        crate::data::Flow::new("invalid-count", 2, |_, _, _| gpui::div().into_any_element())
+            .snapshot(RowSnapshot::new(["a"], vec![0]));
+    }
+
+    #[test]
+    #[should_panic(expected = "one key is required per row")]
+    fn list_rejects_snapshot_count_mismatch() {
+        crate::data::List::new("invalid-count", 2, |_, _, _| {
+            crate::data::ListItem::new("a", "A")
+        })
+        .snapshot(RowSnapshot::new(["a"], vec![0]));
+    }
+
+    #[gpui::test]
+    fn snapshot_reuses_reconciliation_storage_and_legacy_input_retires_it(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let cx = cx.add_empty_window();
+        cx.update(|window, cx| {
+            let ident = Ident::from("snapshot-reuse");
+            let snapshot = RowSnapshot::new(["a", "b", "c"], vec![1, 2, 3]);
+            let reconcile = |rows, cx: &mut App| {
+                list_state(&ident, rows, None, ListAlignment::Top, px(40.), window, cx)
+            };
+            let state = reconcile(Rows::Snapshot(&snapshot), cx);
+            let storage = |cx: &mut App| {
+                window_state::with_key(
+                    &ident.semantic_id(),
+                    window.window_handle().window_id(),
+                    cx,
+                    |flow: &mut Option<Flow>| {
+                        flow.as_ref().expect("mounted flow").revisions.as_ptr()
+                    },
+                )
+            };
+            let before = storage(cx);
+            let cloned = snapshot.clone();
+            state.scroll_to(ListOffset {
+                item_ix: 1,
+                offset_in_item: px(17.),
+            });
+            reconcile(Rows::Snapshot(&cloned), cx);
+            assert_eq!(
+                storage(cx),
+                before,
+                "unchanged snapshots must not copy revisions"
+            );
+            assert_eq!(state.logical_scroll_top().offset_in_item, px(17.));
+            let legacy = keys(&["c", "b", "a"]);
+            reconcile(Rows::Keyed(&legacy), cx);
+            reconcile(Rows::Snapshot(&snapshot), cx);
+            window_state::with_key(
+                &ident.semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+                |flow: &mut Option<Flow>| {
+                    let flow = flow.as_ref().expect("mounted flow");
+                    assert_eq!(flow.keys, snapshot.keys());
+                    assert_eq!(flow.revisions, snapshot.revisions());
+                },
+            );
+        });
+    }
+
     #[gpui::test]
     fn uniform_anchor_retains_pixels_on_resize_and_uses_removal_fallback(
         cx: &mut gpui::TestAppContext,
@@ -513,18 +687,42 @@ mod tests {
         let cx = cx.add_empty_window();
         cx.update(|window, cx| {
             let ident = Ident::from("uniform-anchor");
-            reconcile_uniform(&ident, &keys(&["a", "b", "c", "d"]), px(40.), window, cx);
+            let snapshot = RowSnapshot::new(["a", "b", "c", "d"], vec![0; 4]);
+            reconcile_uniform(&ident, Rows::Snapshot(&snapshot), px(40.), window, cx);
             let handle = scroll_handle(&ident, window, cx);
             handle
                 .0
                 .borrow()
                 .base_handle
                 .set_offset(gpui::point(px(0.), px(-93.)));
-            reconcile_uniform(&ident, &keys(&["d", "a", "c", "b"]), px(60.), window, cx);
+            reconcile_uniform(
+                &ident,
+                Rows::Snapshot(&snapshot.clone()),
+                px(40.),
+                window,
+                cx,
+            );
+            assert_eq!(handle.0.borrow().base_handle.offset().y, px(-93.));
+            // Same identity cannot hide a uniform-height change.
+            reconcile_uniform(&ident, Rows::Snapshot(&snapshot), px(60.), window, cx);
+            assert_eq!(handle.0.borrow().base_handle.offset().y, px(-133.));
+            reconcile_uniform(
+                &ident,
+                Rows::Keyed(&keys(&["d", "a", "c", "b"])),
+                px(60.),
+                window,
+                cx,
+            );
             assert_eq!(handle.0.borrow().base_handle.offset().y, px(-133.));
             // c was followed by b in the old order, even though d is nearer
             // in the new order. Removal restarts that successor at zero.
-            reconcile_uniform(&ident, &keys(&["b", "d", "a"]), px(60.), window, cx);
+            reconcile_uniform(
+                &ident,
+                Rows::Keyed(&keys(&["b", "d", "a"])),
+                px(60.),
+                window,
+                cx,
+            );
             assert_eq!(handle.0.borrow().base_handle.offset().y, px(0.));
         });
     }
@@ -565,15 +763,31 @@ mod tests {
     fn revisions_remeasure_offscreen_rows_without_reidentifying_them(
         cx: &mut gpui::TestAppContext,
     ) {
+        revision_contract(cx, false);
+    }
+
+    #[gpui::test]
+    fn snapshots_remeasure_offscreen_rows_without_reidentifying_them(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        revision_contract(cx, true);
+    }
+
+    fn revision_contract(cx: &mut gpui::TestAppContext, shared: bool) {
         use gpui::{AppContext, Context, IntoElement, Render, Styled, div, list, point, size};
         use std::rc::Rc;
         let cx = cx.add_empty_window();
         let ident = Ident::from("revision-test");
         let names = keys(&["a", "b", "c", "d"]);
+        let snapshot = RowSnapshot::new(names.clone(), vec![0; 4]);
         let state = cx.update(|window, cx| {
             list_state(
                 &ident,
-                Rows::Keyed(&names),
+                if shared {
+                    Rows::Snapshot(&snapshot)
+                } else {
+                    Rows::Keyed(&names)
+                },
                 Some(&[0, 0, 0, 0]),
                 ListAlignment::Top,
                 px(40.),
@@ -608,10 +822,15 @@ mod tests {
             px(80.)
         );
         height.set(125.);
+        let snapshot = RowSnapshot::new(names.clone(), vec![0, 0, 0, 1]);
         cx.update(|window, cx| {
             list_state(
                 &ident,
-                Rows::Keyed(&names),
+                if shared {
+                    Rows::Snapshot(&snapshot)
+                } else {
+                    Rows::Keyed(&names)
+                },
                 Some(&[0, 0, 0, 1]),
                 ListAlignment::Top,
                 px(40.),
@@ -647,10 +866,15 @@ mod tests {
             offset_in_item: px(13.),
         });
         let reordered = keys(&["d", "a", "b", "c"]);
+        let snapshot = RowSnapshot::new(reordered.clone(), vec![1, 0, 0, 0]);
         cx.update(|window, cx| {
             list_state(
                 &ident,
-                Rows::Keyed(&reordered),
+                if shared {
+                    Rows::Snapshot(&snapshot)
+                } else {
+                    Rows::Keyed(&reordered)
+                },
                 Some(&[1, 0, 0, 0]),
                 ListAlignment::Top,
                 px(40.),
@@ -660,5 +884,47 @@ mod tests {
         });
         assert_eq!(state.logical_scroll_top().item_ix, 2);
         assert_eq!(state.logical_scroll_top().offset_in_item, px(13.));
+        if shared {
+            let changed = RowSnapshot::new(["x", "b", "d", "a", "c"], vec![0, 0, 2, 0, 0]);
+            cx.update(|window, cx| {
+                list_state(
+                    &ident,
+                    Rows::Snapshot(&changed),
+                    None,
+                    ListAlignment::Top,
+                    px(40.),
+                    window,
+                    cx,
+                );
+            });
+            assert_eq!(state.logical_scroll_top().item_ix, 1);
+            assert_eq!(state.logical_scroll_top().offset_in_item, px(13.));
+            assert!(
+                state.bounds_for_item(2).is_none(),
+                "reordered d changed revision"
+            );
+            assert_eq!(
+                state.bounds_for_item(3).expect("retained a").size.height,
+                px(40.)
+            );
+            let removed = RowSnapshot::new(["c", "a", "d"], vec![0, 0, 2]);
+            cx.update(|window, cx| {
+                list_state(
+                    &ident,
+                    Rows::Snapshot(&removed),
+                    None,
+                    ListAlignment::Top,
+                    px(40.),
+                    window,
+                    cx,
+                );
+            });
+            assert_eq!(
+                state.logical_scroll_top().item_ix,
+                2,
+                "removed b anchors to old successor d"
+            );
+            assert_eq!(state.logical_scroll_top().offset_in_item, px(0.));
+        }
     }
 }

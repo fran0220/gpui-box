@@ -55,4 +55,4 @@ pub use masonry::{Masonry, MasonryItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
 pub use tree::{BranchState, Tree, TreeNode};
 pub use tree_grid::{TreeGrid, TreeGridRow};
-pub use viewport::{Viewed, glide_to_row, reveal_row, scroll_to_row, viewed_rows};
+pub use viewport::{RowSnapshot, Viewed, glide_to_row, reveal_row, scroll_to_row, viewed_rows};

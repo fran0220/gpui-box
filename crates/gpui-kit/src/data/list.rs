@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ListAlignment, ListSizingBehavior,
@@ -32,7 +33,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::data::flow::Flow;
-use crate::data::viewport::scroll_handle;
+use crate::data::viewport::{RowSnapshot, Rows, scroll_handle};
 pub use crate::data::viewport::{glide_to_row, reveal_row, scroll_to_row};
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
@@ -119,8 +120,9 @@ pub struct List {
     /// Whether a row is as tall as its content rather than as tall as a slot.
     flowing: bool,
     /// The rows in order, when the caller named them. See [`List::keys`].
-    keys: Option<Vec<SharedString>>,
+    keys: Option<Arc<[SharedString]>>,
     revisions: Option<Vec<u64>>,
+    snapshot: Option<RowSnapshot>,
     /// Where a flowing list rests when its content does not fill it.
     alignment: ListAlignment,
     visible_rows: Option<usize>,
@@ -166,6 +168,7 @@ impl List {
             flowing: false,
             keys: None,
             revisions: None,
+            snapshot: None,
             alignment: ListAlignment::Top,
             visible_rows: None,
             fills: false,
@@ -233,6 +236,9 @@ impl List {
     /// [`ListItem::new`] takes. Uniform lists also retain the identity anchor,
     /// using their authored row height rather than measured geometry.
     pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        if let Some(snapshot) = self.snapshot.take() {
+            self.revisions = Some(snapshot.revisions().to_vec());
+        }
         self.keys = Some(keys.into_iter().map(Into::into).collect());
         self
     }
@@ -241,7 +247,23 @@ impl List {
     /// Changes invalidate measurements without changing semantic identities.
     /// Ignored by uniform lists.
     pub fn revisions(mut self, revisions: Vec<u64>) -> Self {
+        self.snapshot = None;
         self.revisions = Some(revisions);
+        self
+    }
+
+    /// Shared identities and geometry, with the same contract as [`Flow::snapshot`].
+    /// Uniform lists reuse identity reconciliation in O(1) while row height is
+    /// unchanged; geometry revisions affect only flowing lists.
+    pub fn snapshot(mut self, snapshot: RowSnapshot) -> Self {
+        assert_eq!(
+            snapshot.keys().len(),
+            self.count,
+            "one key is required per row"
+        );
+        self.keys = Some(snapshot.shared_keys());
+        self.revisions = None;
+        self.snapshot = Some(snapshot);
         self
     }
 
@@ -360,7 +382,15 @@ impl RenderOnce for List {
             && let Some(keys) = &self.keys
         {
             assert_eq!(keys.len(), count, "one key is required per row");
-            crate::data::viewport::reconcile_uniform(&ident, keys, px(row_height), window, cx);
+            crate::data::viewport::reconcile_uniform(
+                &ident,
+                self.snapshot
+                    .as_ref()
+                    .map_or(Rows::Keyed(keys), Rows::Snapshot),
+                px(row_height),
+                window,
+                cx,
+            );
         }
         let reorder = self.reorder(window, cx);
 
@@ -413,11 +443,15 @@ impl RenderOnce for List {
             if self.alignment == ListAlignment::Bottom {
                 flow = flow.anchored_to_end();
             }
-            if let Some(keys) = self.keys.clone() {
-                flow = flow.keys(keys);
-            }
-            if let Some(revisions) = self.revisions.clone() {
-                flow = flow.revisions(revisions);
+            if let Some(snapshot) = &self.snapshot {
+                flow = flow.snapshot(snapshot.clone());
+            } else {
+                if let Some(keys) = &self.keys {
+                    flow = flow.keys(keys.iter().cloned());
+                }
+                if let Some(revisions) = self.revisions.clone() {
+                    flow = flow.revisions(revisions);
+                }
             }
             if self.fills {
                 flow = flow.fills();

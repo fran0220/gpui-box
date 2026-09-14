@@ -233,6 +233,12 @@ pub(super) fn fixture_record(index: usize) -> (SharedString, SharedString) {
 }
 
 pub(super) fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    static ROWS: std::sync::LazyLock<crate::data::RowSnapshot> = std::sync::LazyLock::new(|| {
+        crate::data::RowSnapshot::new(
+            (0..FIXTURE_RECORDS).map(|index| fixture_record(index).0),
+            vec![0; FIXTURE_RECORDS],
+        )
+    });
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(420.0))
@@ -257,6 +263,7 @@ pub(super) fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
                         let (id, label) = fixture_record(index);
                         ListItem::new(id, label.clone()).text(label)
                     })
+                    .snapshot(ROWS.clone())
                     .selected(fixture_record(2).0)
                     .visible_rows(8)
                     .on_select(|_, _, _| {}),
@@ -288,6 +295,12 @@ fn fixture_entry(index: usize) -> (SharedString, SharedString) {
 const FLOW_VISIBLE_ROWS: usize = 5;
 
 pub(super) fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {
+    static ROWS: std::sync::LazyLock<crate::data::RowSnapshot> = std::sync::LazyLock::new(|| {
+        crate::data::RowSnapshot::new(
+            (0..FIXTURE_RECORDS).map(|index| fixture_entry(index).0),
+            vec![0; FIXTURE_RECORDS],
+        )
+    });
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(560.0))
@@ -355,6 +368,7 @@ pub(super) fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {
                                                 .into_any_element()
                                         },
                                     )
+                                    .snapshot(ROWS.clone())
                                     .estimate(72.0)
                                     .visible_rows(FLOW_VISIBLE_ROWS),
                                 )

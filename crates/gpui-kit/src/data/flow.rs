@@ -49,7 +49,7 @@ use gpui::{
 };
 use gpui_kit_theme::{ActiveTheme, ControlSize};
 
-use crate::data::viewport::{Rows, list_state};
+use crate::data::viewport::{RowSnapshot, Rows, list_state};
 use crate::foundation::Ident;
 
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> AnyElement>;
@@ -75,6 +75,7 @@ pub struct Flow {
     render_row: RenderRow,
     keys: Option<Vec<SharedString>>,
     revisions: Option<Vec<u64>>,
+    snapshot: Option<RowSnapshot>,
     estimate: Option<f32>,
     alignment: ListAlignment,
     extent: Extent,
@@ -87,7 +88,7 @@ impl std::fmt::Debug for Flow {
             .debug_struct("Flow")
             .field("ident", &self.ident)
             .field("count", &self.count)
-            .field("named", &self.keys.is_some())
+            .field("named", &(self.keys.is_some() || self.snapshot.is_some()))
             .field("extent", &self.extent)
             .field("inset", &self.inset)
             .finish()
@@ -112,6 +113,7 @@ impl Flow {
             render_row: Rc::new(render_row),
             keys: None,
             revisions: None,
+            snapshot: None,
             estimate: None,
             alignment: ListAlignment::Top,
             extent: Extent::Content,
@@ -125,6 +127,9 @@ impl Flow {
     /// Names must be unique, stable identities, never content hashes. Use
     /// [`Self::revisions`] to invalidate geometry independently of identity.
     pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        if let Some(snapshot) = self.snapshot.take() {
+            self.revisions = Some(snapshot.revisions().to_vec());
+        }
         self.keys = Some(keys.into_iter().map(Into::into).collect());
         self
     }
@@ -135,7 +140,26 @@ impl Flow {
     /// for every row; revisions need not be monotonic. Requires unique keys
     /// and exactly `count` revisions.
     pub fn revisions(mut self, revisions: Vec<u64>) -> Self {
+        if let Some(snapshot) = self.snapshot.take() {
+            self.keys = Some(snapshot.keys().to_vec());
+        }
         self.revisions = Some(revisions);
+        self
+    }
+
+    /// Shared, validated identities and geometry. Clone the same snapshot on
+    /// scroll-driven renders for O(1) reconciliation. Replaces keys/revisions;
+    /// calling either setter later leaves snapshot mode. Panics if its row
+    /// count differs from the count passed to `new`.
+    pub fn snapshot(mut self, snapshot: RowSnapshot) -> Self {
+        assert_eq!(
+            snapshot.keys().len(),
+            self.count,
+            "one key is required per row"
+        );
+        self.keys = None;
+        self.revisions = None;
+        self.snapshot = Some(snapshot);
         self
     }
 
@@ -193,6 +217,7 @@ impl RenderOnce for Flow {
             // believed and the names are not.
             _ => Rows::Counted(self.count),
         };
+        let described = self.snapshot.as_ref().map_or(described, Rows::Snapshot);
         let state = list_state(
             &self.ident,
             described,
