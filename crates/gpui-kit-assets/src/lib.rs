@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(Icon::Star.weight(), IconWeight::Regular);
         assert_eq!(Icon::Star.filled().weight(), IconWeight::Fill);
         assert_eq!(Icon::StarFilled, Icon::Star.filled());
-        assert_eq!(IconName::ALL.len(), 76);
+        assert_eq!(IconName::ALL.len(), 77);
         assert_eq!(Icon::ALL.len(), IconName::ALL.len());
     }
 

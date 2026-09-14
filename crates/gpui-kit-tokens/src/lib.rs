@@ -790,6 +790,10 @@ impl TokenDocument {
 
     pub fn interactive(&self, role: InteractiveColor) -> Color {
         let (path, value) = match role {
+            InteractiveColor::ChoiceIndicator => (
+                "color.interactive.choiceIndicator",
+                self.color.interactive.choice_indicator.as_str(),
+            ),
             InteractiveColor::Hover => (
                 "color.interactive.hover",
                 self.color.interactive.hover.as_str(),
@@ -1298,6 +1302,11 @@ pub enum TextTone {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InteractiveColor {
+    /// The defining edge of an unchecked checkbox or radio.
+    ///
+    /// Unlike `controlHairline`, this is required to identify a choice at
+    /// rest, so it clears non-text contrast against the control fill.
+    ChoiceIndicator,
     Hover,
     Active,
     Selected,
@@ -1950,12 +1959,16 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 78] = [
+        let fixed: [(&'static str, &str); 79] = [
             ("color.surface.control", &self.surface.control),
             ("color.surface.controlHover", &self.surface.control_hover),
             (
                 "color.surface.controlPressed",
                 &self.surface.control_pressed,
+            ),
+            (
+                "color.interactive.choiceIndicator",
+                &self.interactive.choice_indicator,
             ),
             (
                 "color.interactive.controlHairline",
@@ -2117,6 +2130,7 @@ pub struct TextColors {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InteractiveColors {
+    pub choice_indicator: String,
     pub control_hairline: String,
     pub control_highlight: String,
     pub hover: String,

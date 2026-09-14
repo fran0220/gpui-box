@@ -1,8 +1,10 @@
+use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Div, EffectScoped, FocusHandle, Hsla, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    AnyElement, App, Bounds, Div, EffectScoped, Element, FocusHandle, GlobalElementId, Hsla,
+    InspectorElementId, InteractiveElement, IntoElement, LayoutId, ParentElement, Pixels,
+    RenderOnce, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
@@ -77,7 +79,7 @@ pub enum ButtonJoin {
     Trailing,
 }
 
-type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+type ClickHandler = Rc<dyn Fn(Bounds<Pixels>, &mut Window, &mut App)>;
 
 /// A labeled action.
 ///
@@ -318,6 +320,20 @@ impl Button {
     }
 
     pub fn on_click(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_click = Some(Rc::new(move |_, window, cx| handler(window, cx)));
+        self
+    }
+
+    /// Runs an action with this button's current complete layout bounds.
+    ///
+    /// Pointer and keyboard activation report the same bounds, so a caller can
+    /// anchor a menu without consulting pointer position or a diagnostic
+    /// semantic snapshot. The bounds are GPUI logical pixels from the frame
+    /// that accepted the action.
+    pub fn on_click_with_bounds(
+        mut self,
+        handler: impl Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
         self.on_click = Some(Rc::new(handler));
         self
     }
@@ -505,16 +521,19 @@ impl RenderOnce for Button {
             })
             .children(content);
 
+        let action_bounds = Rc::new(Cell::new(Bounds::default()));
         if let (true, Some(handler)) = (actionable, self.on_click.clone()) {
             let on_click = Rc::clone(&handler);
+            let click_bounds = Rc::clone(&action_bounds);
             button
                 .interactivity()
-                .on_click(move |_, window, cx| on_click(window, cx));
+                .on_click(move |_, window, cx| on_click(click_bounds.get(), window, cx));
+            let key_bounds = Rc::clone(&action_bounds);
             button
                 .interactivity()
                 .on_key_down(move |event, window, cx| {
                     if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                        handler(window, cx);
+                        handler(key_bounds.get(), window, cx);
                         cx.stop_propagation();
                     }
                 });
@@ -540,7 +559,74 @@ impl RenderOnce for Button {
         if let Some(description) = self.description {
             spec = spec.description(description);
         }
-        button.semantic_in(cx, spec)
+        ActionBounds {
+            child: button.semantic_in(cx, spec).into_any_element(),
+            bounds: action_bounds,
+        }
+    }
+}
+
+/// A layout-transparent wrapper that gives an action the exact bounds GPUI
+/// assigned it during the same prepaint that installed its hitbox.
+struct ActionBounds {
+    child: AnyElement,
+    bounds: Rc<Cell<Bounds<Pixels>>>,
+}
+
+impl IntoElement for ActionBounds {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for ActionBounds {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<gpui::ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        self.bounds.set(bounds);
+        self.child.prepaint(window, cx);
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut Self::RequestLayoutState,
+        _: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.child.paint(window, cx);
     }
 }
 
@@ -834,6 +920,16 @@ impl IconButton {
         self.button = self.button.on_click(handler);
         self
     }
+
+    /// Runs an action with this icon button's current complete layout bounds.
+    /// See [`Button::on_click_with_bounds`].
+    pub fn on_click_with_bounds(
+        mut self,
+        handler: impl Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.button = self.button.on_click_with_bounds(handler);
+        self
+    }
 }
 
 impl Disableable for IconButton {
@@ -978,7 +1074,10 @@ impl RenderOnce for ButtonGroup {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::*;
+    use gpui_kit_testkit::harness::Harness;
     use gpui_kit_theme::{ColorChoice, SemanticColor};
     use gpui_kit_tokens::over;
 
@@ -1141,6 +1240,97 @@ mod tests {
         assert_eq!(
             selected_fill_for(&theme, Some((Variant::Transparent, colors))),
             theme.colors.active
+        );
+    }
+
+    /// Menu anchors must come from the control's layout, not from the pointer:
+    /// keyboard activation has no meaningful pointer position. An asymmetric
+    /// offset also catches accidentally reporting the glyph or window bounds.
+    #[gpui::test]
+    fn bounds_aware_icon_button_reports_its_complete_geometry_for_every_activation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let reported = Rc::new(RefCell::new(Vec::new()));
+        let action_focus = Rc::new(RefCell::new(None));
+        let disabled_focus = Rc::new(RefCell::new(None));
+        let mut harness = Harness::new(cx, crate::install, {
+            let reported = Rc::clone(&reported);
+            let action_focus = Rc::clone(&action_focus);
+            let disabled_focus = Rc::clone(&disabled_focus);
+            move |_, cx| {
+                let action_focus = action_focus
+                    .borrow_mut()
+                    .get_or_insert_with(|| cx.focus_handle())
+                    .clone();
+                let disabled_focus = disabled_focus
+                    .borrow_mut()
+                    .get_or_insert_with(|| cx.focus_handle())
+                    .clone();
+                div()
+                    .pt(px(37.0))
+                    .pl(px(53.0))
+                    .child(
+                        IconButton::new("measured-action", Icon::MoreHorizontal, "More actions")
+                            .control_size(ControlSize::Sm)
+                            .track_focus(&action_focus)
+                            .on_click_with_bounds({
+                                let reported = Rc::clone(&reported);
+                                move |bounds, _, _| reported.borrow_mut().push(bounds)
+                            }),
+                    )
+                    .child(
+                        IconButton::new("disabled-action", Icon::MoreHorizontal, "Unavailable")
+                            .control_size(ControlSize::Sm)
+                            .track_focus(&disabled_focus)
+                            .disabled(true)
+                            .on_click_with_bounds({
+                                let reported = Rc::clone(&reported);
+                                move |bounds, _, _| reported.borrow_mut().push(bounds)
+                            }),
+                    )
+                    .into_any_element()
+            }
+        });
+
+        // Press travel deliberately moves the painted/hit-tested frame while
+        // the pointer is held. Remove only that transient motion so pointer
+        // and keyboard activations can be compared against one independently
+        // measured resting rectangle rather than against two visual states.
+        harness.update(|_, cx| cx.set_reduce_motion(true));
+
+        let expected = harness
+            .bounds("measured-action")
+            .expect("button has measured geometry");
+        assert_eq!(expected.origin, gpui::point(px(53.0), px(37.0)));
+        assert!(expected.size.width > px(0.0) && expected.size.height > px(0.0));
+
+        harness.click("measured-action");
+        harness.update(|window, cx| {
+            action_focus
+                .borrow()
+                .as_ref()
+                .expect("action focus")
+                .focus(window, cx)
+        });
+        harness.keystrokes("enter space");
+        assert_eq!(
+            reported.borrow().as_slice(),
+            &[expected, expected, expected]
+        );
+
+        harness.click("disabled-action");
+        harness.update(|window, cx| {
+            disabled_focus
+                .borrow()
+                .as_ref()
+                .expect("disabled focus")
+                .focus(window, cx)
+        });
+        harness.keystrokes("enter space");
+        assert_eq!(
+            reported.borrow().len(),
+            3,
+            "disabled controls install neither pointer nor keyboard actions"
         );
     }
 }

@@ -264,6 +264,11 @@ source = "monitor"
 mirroring = "fixed"
 
 [[icon]]
+variant = "MoreHorizontal"
+source = "dots-three"
+mirroring = "fixed"
+
+[[icon]]
 variant = "Notebook"
 source = "notebook"
 mirroring = "fixed"

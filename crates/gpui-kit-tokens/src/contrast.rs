@@ -69,6 +69,13 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     ] {
         let background =
             Color::resolve(name, value, &tokens.color.palette).expect("validated control color");
+        checks.push(check(
+            "color.interactive.choiceIndicator",
+            tokens.interactive(InteractiveColor::ChoiceIndicator),
+            name,
+            background,
+            NON_TEXT_MINIMUM,
+        ));
         for (tone_name, tone, minimum) in [
             ("color.text.primary", TextTone::Primary, TEXT_MINIMUM),
             ("color.text.muted", TextTone::Muted, TEXT_MINIMUM),
@@ -1105,11 +1112,25 @@ mod tests {
         // live canvas roles and the two stackings of an edge label,
         // `onAccent` against `accent`, and the primary fill against each of
         // the six surfaces with its own label over it. Four text roles also
-        // cover the three in-content control fills.
+        // cover the three in-content control fills, as does the choice
+        // indicator that has to define an unchecked control at rest.
         assert_eq!(
             checks.len(),
-            6 * 23 + 2 * 10 + 16 + 3 * 8 + 12 + 1 + 6 + 1 + 3 * 4
+            6 * 23 + 2 * 10 + 16 + 3 * 8 + 12 + 1 + 6 + 1 + 3 * 5
         );
+    }
+
+    #[test]
+    fn choice_indicator_is_not_an_optional_control_hairline() {
+        let mut tokens = crate::studio_light().clone();
+        tokens.color.interactive.control_hairline = "#00000000".into();
+
+        let checks: Vec<_> = report(&tokens)
+            .into_iter()
+            .filter(|check| check.foreground == "color.interactive.choiceIndicator")
+            .collect();
+        assert_eq!(checks.len(), 3);
+        assert!(checks.iter().all(ContrastCheck::passes));
     }
 
     /// The primary fill is a role a theme owns, not the prose colour under a

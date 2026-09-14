@@ -73,6 +73,7 @@ pub enum IconName {
     Magnifier,
     Minus,
     Monitor,
+    MoreHorizontal,
     Notebook,
     Paperclip,
     Pause,
@@ -153,6 +154,7 @@ impl IconName {
         Self::Magnifier,
         Self::Minus,
         Self::Monitor,
+        Self::MoreHorizontal,
         Self::Notebook,
         Self::Paperclip,
         Self::Pause,
@@ -233,6 +235,7 @@ impl IconName {
             Self::Magnifier => "magnifying-glass",
             Self::Minus => "minus",
             Self::Monitor => "monitor",
+            Self::MoreHorizontal => "dots-three",
             Self::Notebook => "notebook",
             Self::Paperclip => "paperclip",
             Self::Pause => "pause",
@@ -314,6 +317,7 @@ impl IconName {
             Self::Magnifier => Mirroring::Directional,
             Self::Minus => Mirroring::Fixed,
             Self::Monitor => Mirroring::Fixed,
+            Self::MoreHorizontal => Mirroring::Fixed,
             Self::Notebook => Mirroring::Fixed,
             Self::Paperclip => Mirroring::Directional,
             Self::Pause => Mirroring::Fixed,
@@ -403,6 +407,7 @@ impl Icon {
         Self::Magnifier,
         Self::Minus,
         Self::Monitor,
+        Self::MoreHorizontal,
         Self::Notebook,
         Self::Paperclip,
         Self::Pause,
@@ -481,6 +486,7 @@ impl Icon {
     pub const Magnifier: Self = Self::new(IconName::Magnifier);
     pub const Minus: Self = Self::new(IconName::Minus);
     pub const Monitor: Self = Self::new(IconName::Monitor);
+    pub const MoreHorizontal: Self = Self::new(IconName::MoreHorizontal);
     pub const Notebook: Self = Self::new(IconName::Notebook);
     pub const Paperclip: Self = Self::new(IconName::Paperclip);
     pub const Pause: Self = Self::new(IconName::Pause);
@@ -645,6 +651,8 @@ impl Icon {
             (IconName::Minus, IconWeight::Fill) => "icons/fill/minus-fill.svg",
             (IconName::Monitor, IconWeight::Regular) => "icons/regular/monitor.svg",
             (IconName::Monitor, IconWeight::Fill) => "icons/fill/monitor-fill.svg",
+            (IconName::MoreHorizontal, IconWeight::Regular) => "icons/regular/dots-three.svg",
+            (IconName::MoreHorizontal, IconWeight::Fill) => "icons/fill/dots-three-fill.svg",
             (IconName::Notebook, IconWeight::Regular) => "icons/regular/notebook.svg",
             (IconName::Notebook, IconWeight::Fill) => "icons/fill/notebook-fill.svg",
             (IconName::Paperclip, IconWeight::Regular) => "icons/regular/paperclip.svg",
@@ -1011,6 +1019,12 @@ impl Icon {
                 (IconName::Monitor, IconWeight::Fill) => {
                     include_bytes!("../assets/icons/fill/monitor-fill.svg").as_slice()
                 }
+                (IconName::MoreHorizontal, IconWeight::Regular) => {
+                    include_bytes!("../assets/icons/regular/dots-three.svg").as_slice()
+                }
+                (IconName::MoreHorizontal, IconWeight::Fill) => {
+                    include_bytes!("../assets/icons/fill/dots-three-fill.svg").as_slice()
+                }
                 (IconName::Notebook, IconWeight::Regular) => {
                     include_bytes!("../assets/icons/regular/notebook.svg").as_slice()
                 }
@@ -1280,6 +1294,8 @@ pub(crate) const ALL_PATHS: &[&str] = &[
     "icons/fill/minus-fill.svg",
     "icons/regular/monitor.svg",
     "icons/fill/monitor-fill.svg",
+    "icons/regular/dots-three.svg",
+    "icons/fill/dots-three-fill.svg",
     "icons/regular/notebook.svg",
     "icons/fill/notebook-fill.svg",
     "icons/regular/paperclip.svg",
@@ -1639,6 +1655,12 @@ pub(crate) fn load(path: &str) -> Option<Cow<'static, [u8]>> {
         )),
         "icons/fill/monitor-fill.svg" => Some(Cow::Borrowed(
             include_bytes!("../assets/icons/fill/monitor-fill.svg").as_slice(),
+        )),
+        "icons/regular/dots-three.svg" => Some(Cow::Borrowed(
+            include_bytes!("../assets/icons/regular/dots-three.svg").as_slice(),
+        )),
+        "icons/fill/dots-three-fill.svg" => Some(Cow::Borrowed(
+            include_bytes!("../assets/icons/fill/dots-three-fill.svg").as_slice(),
         )),
         "icons/regular/notebook.svg" => Some(Cow::Borrowed(
             include_bytes!("../assets/icons/regular/notebook.svg").as_slice(),

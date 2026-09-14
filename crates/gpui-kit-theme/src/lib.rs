@@ -289,6 +289,9 @@ pub struct Colors {
     pub control: Hsla,
     pub control_hover: Hsla,
     pub control_pressed: Hsla,
+    /// The defining edge of an unchecked checkbox or radio. Unlike a field's
+    /// optional hairline, this edge must remain visible at rest.
+    pub choice_indicator: Hsla,
     pub control_hairline: Hsla,
     pub control_highlight: Hsla,
     /// Appearance-independent reading roles for Clear glass above media.
@@ -1057,6 +1060,10 @@ impl Theme {
                 control_pressed: media_color(
                     "color.surface.controlPressed",
                     &tokens.color.surface.control_pressed,
+                ),
+                choice_indicator: media_color(
+                    "color.interactive.choiceIndicator",
+                    &tokens.color.interactive.choice_indicator,
                 ),
                 control_hairline: media_color(
                     "color.interactive.controlHairline",

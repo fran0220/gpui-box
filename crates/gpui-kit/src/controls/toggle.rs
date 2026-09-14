@@ -145,6 +145,7 @@ impl RenderOnce for Checkbox {
             cx,
         );
         let filled = drawn.x.max(drawn.y);
+        let hover_group = self.ident.child("hover").semantic_id();
 
         let mark = div()
             .size(side)
@@ -154,7 +155,22 @@ impl RenderOnce for Checkbox {
             .flex_none()
             .relative()
             .radius(&theme, Radius::Small)
-            .bg(theme.colors.sunken.lerp(theme.colors.accent, filled))
+            .border(px(theme.borders.hairline))
+            .border_color(
+                theme
+                    .colors
+                    .choice_indicator
+                    .lerp(theme.colors.accent, filled),
+            )
+            .bg(theme.colors.control.lerp(theme.colors.accent, filled))
+            .when(actionable, |element| {
+                element.group_hover(hover_group, |style| {
+                    style.border_color(theme.colors.accent_strong).bg(theme
+                        .colors
+                        .control_hover
+                        .lerp(theme.colors.accent_strong, filled))
+                })
+            })
             .when(drawn.y > 0.0, |element| {
                 element.child(
                     div()
@@ -309,6 +325,7 @@ impl RenderOnce for Radio {
             window,
             cx,
         );
+        let hover_group = self.ident.child("hover").semantic_id();
 
         let mark = div()
             .size(side)
@@ -317,7 +334,22 @@ impl RenderOnce for Radio {
             .justify_center()
             .flex_none()
             .rounded_full()
-            .bg(theme.colors.sunken.lerp(theme.colors.accent, drawn))
+            .border(px(theme.borders.hairline))
+            .border_color(
+                theme
+                    .colors
+                    .choice_indicator
+                    .lerp(theme.colors.accent, drawn),
+            )
+            .bg(theme.colors.control.lerp(theme.colors.accent, drawn))
+            .when(actionable, |element| {
+                element.group_hover(hover_group, |style| {
+                    style.border_color(theme.colors.accent_strong).bg(theme
+                        .colors
+                        .control_hover
+                        .lerp(theme.colors.accent_strong, drawn))
+                })
+            })
             .when(drawn > 0.0, |element| {
                 element.child(
                     div()
@@ -561,6 +593,7 @@ fn choice_row(
 
     let mut row = div()
         .id(ident.element_id())
+        .group(ident.child("hover").semantic_id())
         .flex()
         .flex_row()
         .items_start()
@@ -607,4 +640,71 @@ fn choice_row(
     }
 
     row
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use gpui::IntoElement as _;
+    use gpui_kit_semantics::Role;
+    use gpui_kit_testkit::harness::Harness;
+
+    use super::*;
+
+    #[gpui::test]
+    fn choices_report_pointer_and_keyboard_intent_without_owning_state(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let selections = Rc::new(Cell::new(0));
+        let changes = Rc::new(Cell::new(0));
+        let mut harness = Harness::new(cx, crate::install, {
+            let selections = selections.clone();
+            let changes = changes.clone();
+            move |_, _| {
+                div()
+                    .child(Radio::new("radio").label("Radio").on_select({
+                        let selections = selections.clone();
+                        move |_, _| selections.set(selections.get() + 1)
+                    }))
+                    .child(
+                        Radio::new("disabled-radio")
+                            .label("Disabled radio")
+                            .disabled(true)
+                            .on_select({
+                                let selections = selections.clone();
+                                move |_, _| selections.set(selections.get() + 100)
+                            }),
+                    )
+                    .child(Checkbox::new("checkbox").label("Checkbox").on_change({
+                        let changes = changes.clone();
+                        move |next, _, _| {
+                            assert!(next);
+                            changes.set(changes.get() + 1);
+                        }
+                    }))
+                    .into_any_element()
+            }
+        });
+
+        harness.click("radio");
+        harness.keystrokes("space");
+        harness.click("disabled-radio");
+        harness.click("checkbox");
+
+        assert_eq!(selections.get(), 2);
+        assert_eq!(changes.get(), 1);
+        let radio = harness.node("radio").expect("radio semantics");
+        assert_eq!(radio.role, Role::Radio);
+        assert_eq!(radio.checked, Some(false), "the caller refused selection");
+        assert!(
+            harness
+                .node("disabled-radio")
+                .expect("disabled radio semantics")
+                .disabled
+        );
+        let checkbox = harness.node("checkbox").expect("checkbox semantics");
+        assert_eq!(checkbox.role, Role::Checkbox);
+        assert_eq!(checkbox.checked, Some(false), "the caller refused change");
+    }
 }

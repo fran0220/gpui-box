@@ -51,6 +51,7 @@ export const builtinIconKeys = Object.freeze([
   "magnifying-glass",
   "minus",
   "monitor",
+  "dots-three",
   "notebook",
   "paperclip",
   "pause",

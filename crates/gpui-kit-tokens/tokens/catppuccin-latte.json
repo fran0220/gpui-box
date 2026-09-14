@@ -289,6 +289,7 @@
       "hairlineStrong": "{neutral.850}/8c",
       "track": "{neutral.850}/8c",
       "divider": "{neutral.850}/14",
+      "choiceIndicator": "{neutral.700}",
       "controlHairline": "#00000024",
       "controlHighlight": "#ffffffcc",
       "focus": "#1e66f5",
