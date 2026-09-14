@@ -113,6 +113,14 @@ descriptions remain available and may coexist with a relationship. Form labels,
 help/error text, hidden search labels, and visible deferred tooltips use the
 relationship path.
 
+Kit's explicit `Tooltipped::help_tip` attaches one described help surface to a
+stable, focusable control. Pointer hover uses the ordinary delay, real GPUI
+focus shows the same surface immediately, Escape suppresses it for that focus
+tenure, and blur or removal clears it. Placement comes from the owner's
+displayed bounds after visual transforms; semantic snapshots are diagnostic
+output, never runtime focus or geometry authority. The older `tip` remains
+hover-only.
+
 A role-bearing option in a deferred overlay may declare
 `aria_active_descendant_of(owner)` when keyboard focus remains on a composite
 outside that overlay's rendered subtree. End-of-frame resolution projects the

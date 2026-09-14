@@ -727,6 +727,32 @@ impl Interactivity {
         self.tooltip_builder = Some(TooltipBuilder {
             build: Rc::new(build_tooltip),
             hoverable: false,
+            focusable: false,
+        });
+    }
+
+    /// Use the given callback to construct one tooltip view while this element is hovered or
+    /// focused. Hover uses the normal tooltip delay; keyboard focus shows the same tooltip
+    /// immediately. Escape dismisses it until focus leaves the element.
+    ///
+    /// The element must have an id so its tooltip state persists across frames, and it must be
+    /// focusable (for example with [`InteractiveElement::tab_index`] or
+    /// [`InteractiveElement::track_focus`]) for the focus behavior to apply.
+    /// The imperative API equivalent to [`StatefulInteractiveElement::focusable_tooltip`].
+    pub fn focusable_tooltip(
+        &mut self,
+        build_tooltip: impl Fn(&mut Window, &mut App) -> AnyView + 'static,
+    ) where
+        Self: Sized,
+    {
+        debug_assert!(
+            self.tooltip_builder.is_none(),
+            "calling tooltip more than once on the same element is not supported"
+        );
+        self.tooltip_builder = Some(TooltipBuilder {
+            build: Rc::new(build_tooltip),
+            hoverable: false,
+            focusable: true,
         });
     }
 
@@ -746,6 +772,7 @@ impl Interactivity {
         self.tooltip_builder = Some(TooltipBuilder {
             build: Rc::new(build_tooltip),
             hoverable: true,
+            focusable: false,
         });
     }
 
@@ -1823,6 +1850,23 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self
     }
 
+    /// Use the given callback to construct one tooltip view while this element is hovered or
+    /// focused. Hover uses the normal tooltip delay; keyboard focus shows the same tooltip
+    /// immediately. Escape dismisses it until focus leaves the element.
+    ///
+    /// The element must have an id and be focusable for the focus behavior to apply.
+    /// The fluent API equivalent to [`Interactivity::focusable_tooltip`].
+    fn focusable_tooltip(
+        mut self,
+        build_tooltip: impl Fn(&mut Window, &mut App) -> AnyView + 'static,
+    ) -> Self
+    where
+        Self: Sized,
+    {
+        self.interactivity().focusable_tooltip(build_tooltip);
+        self
+    }
+
     /// Set the delay before this element's tooltip is shown.
     /// The fluent API equivalent to [`Interactivity::tooltip_show_delay`].
     fn tooltip_show_delay(mut self, delay: Duration) -> Self
@@ -1871,6 +1915,7 @@ type CanDropPredicate = Box<dyn Fn(&dyn Any, &mut Window, &mut App) -> bool + 's
 pub(crate) struct TooltipBuilder {
     build: Rc<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>,
     hoverable: bool,
+    focusable: bool,
 }
 
 pub(crate) type KeyDownListener =
@@ -2486,6 +2531,32 @@ impl Interactivity {
                     }
                     if let Some(active_tooltip) = element_state.active_tooltip.as_ref() {
                         if self.tooltip_builder.is_some() {
+                            if self
+                                .tooltip_builder
+                                .as_ref()
+                                .is_some_and(|builder| builder.focusable)
+                                && self
+                                    .tracked_focus_handle
+                                    .as_ref()
+                                    .is_some_and(|handle| handle.is_focused(window))
+                                && element_state
+                                    .focus_tooltip_state
+                                    .as_ref()
+                                    .is_none_or(|state| {
+                                        state.borrow().dismissed_focus_generation
+                                            != Some(window.focus_generation)
+                                    })
+                            {
+                                let anchor =
+                                    window.visual_transform().map_bounds(bounds).bottom_left();
+                                match active_tooltip.borrow_mut().as_mut() {
+                                    Some(ActiveTooltip::Visible { tooltip, .. })
+                                    | Some(ActiveTooltip::WaitingForHide { tooltip, .. }) => {
+                                        tooltip.mouse_position = anchor;
+                                    }
+                                    None | Some(ActiveTooltip::WaitingForShow { .. }) => {}
+                                }
+                            }
                             self.tooltip_id = set_tooltip_on_window(active_tooltip, window);
                         } else {
                             // If there is no longer a tooltip builder, remove the active tooltip.
@@ -3301,11 +3372,21 @@ impl Interactivity {
                     .clone();
 
                 let tooltip_is_hoverable = tooltip_builder.hoverable;
+                let tooltip_is_focusable = tooltip_builder.focusable;
                 let build_tooltip = Rc::new(move |window: &mut Window, cx: &mut App| {
                     Some(((tooltip_builder.build)(window, cx), tooltip_is_hoverable))
                 });
+                let focus_handle = tooltip_is_focusable
+                    .then(|| self.tracked_focus_handle.clone())
+                    .flatten();
+                let focus_state = tooltip_is_focusable.then(|| {
+                    element_state
+                        .focus_tooltip_state
+                        .get_or_insert_with(Default::default)
+                        .clone()
+                });
                 // Use bounds instead of testing hitbox since this is called during prepaint.
-                let check_is_hovered_during_prepaint = Rc::new({
+                let check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool> = Rc::new({
                     let pending_mouse_down = pending_mouse_down.clone();
                     let source_bounds = hitbox.displayed_bounds();
                     move |window: &Window| {
@@ -3314,18 +3395,113 @@ impl Interactivity {
                             && source_bounds.contains(&window.mouse_position())
                     }
                 });
-                let check_is_hovered = Rc::new({
+                let check_is_hovered: Rc<dyn Fn(&Window) -> bool> = Rc::new({
                     let hitbox = hitbox.clone();
                     move |window: &Window| {
                         pending_mouse_down.borrow().is_none() && hitbox.is_hovered(window)
                     }
                 });
+                let check_is_hovered_during_prepaint =
+                    if let (Some(focus_handle), Some(focus_state)) =
+                        (focus_handle.clone(), focus_state.clone())
+                    {
+                        let check_is_hovered = check_is_hovered_during_prepaint.clone();
+                        Rc::new(move |window: &Window| {
+                            check_is_hovered(window)
+                                && !(focus_handle.is_focused(window)
+                                    && focus_state.borrow().dismissed_focus_generation
+                                        == Some(window.focus_generation))
+                        }) as Rc<dyn Fn(&Window) -> bool>
+                    } else {
+                        check_is_hovered_during_prepaint
+                    };
+                let check_is_hovered = if let (Some(focus_handle), Some(focus_state)) =
+                    (focus_handle.clone(), focus_state.clone())
+                {
+                    let check_is_hovered = check_is_hovered.clone();
+                    Rc::new(move |window: &Window| {
+                        check_is_hovered(window)
+                            && !(focus_handle.is_focused(window)
+                                && focus_state.borrow().dismissed_focus_generation
+                                    == Some(window.focus_generation))
+                    }) as Rc<dyn Fn(&Window) -> bool>
+                } else {
+                    check_is_hovered
+                };
+                let check_is_active_during_prepaint: Rc<dyn Fn(&Window) -> bool> =
+                    if let (Some(focus_handle), Some(focus_state)) =
+                        (focus_handle.clone(), focus_state.clone())
+                    {
+                        let check_is_hovered = check_is_hovered_during_prepaint.clone();
+                        Rc::new(move |window| {
+                            check_is_hovered(window)
+                                || (focus_handle.is_focused(window)
+                                    && focus_state.borrow().dismissed_focus_generation
+                                        != Some(window.focus_generation))
+                        })
+                    } else {
+                        check_is_hovered_during_prepaint.clone()
+                    };
+
+                if let (Some(focus_handle), Some(focus_state)) =
+                    (focus_handle.clone(), focus_state.clone())
+                {
+                    let is_focused = focus_handle.is_focused(window);
+                    let focus_generation = is_focused.then_some(window.focus_generation);
+                    let was_focused = focus_state.borrow().active_focus_generation.is_some();
+                    focus_state.borrow_mut().active_focus_generation = focus_generation;
+                    if was_focused && !is_focused {
+                        clear_active_tooltip(&active_tooltip, window);
+                    } else if let Some(focus_generation) = focus_generation
+                        && focus_state.borrow().dismissed_focus_generation != Some(focus_generation)
+                    {
+                        let anchor = hitbox.displayed_bounds().bottom_left();
+                        let check_visible = tooltip_check_visible_callback(
+                            &active_tooltip,
+                            tooltip_is_hoverable,
+                            check_is_active_during_prepaint.clone(),
+                        );
+                        let mut active = active_tooltip.borrow_mut();
+                        match active.as_mut() {
+                            Some(ActiveTooltip::Visible { tooltip, .. })
+                            | Some(ActiveTooltip::WaitingForHide { tooltip, .. }) => {
+                                tooltip.mouse_position = anchor;
+                                tooltip.check_visible_and_update = check_visible;
+                            }
+                            None | Some(ActiveTooltip::WaitingForShow { .. }) => {
+                                *active = build_tooltip(window, cx).map(|(view, is_hoverable)| {
+                                    ActiveTooltip::Visible {
+                                        tooltip: AnyTooltip {
+                                            view,
+                                            mouse_position: anchor,
+                                            check_visible_and_update: check_visible,
+                                        },
+                                        is_hoverable,
+                                    }
+                                });
+                                window.refresh();
+                            }
+                        }
+                    }
+
+                    let active_tooltip = active_tooltip.clone();
+                    window.on_key_event(move |event: &KeyDownEvent, phase, window, _cx| {
+                        if phase.bubble()
+                            && event.keystroke.key == "escape"
+                            && focus_handle.is_focused(window)
+                        {
+                            focus_state.borrow_mut().dismissed_focus_generation =
+                                Some(window.focus_generation);
+                            clear_active_tooltip(&active_tooltip, window);
+                        }
+                    });
+                }
                 register_tooltip_mouse_handlers(
                     &active_tooltip,
                     self.tooltip_id,
                     build_tooltip,
                     check_is_hovered,
-                    check_is_hovered_during_prepaint,
+                    check_is_active_during_prepaint,
                     self.tooltip_show_delay,
                     window,
                 );
@@ -3779,6 +3955,13 @@ pub struct InteractiveElementState {
     pub(crate) scroll_offset: Option<Rc<RefCell<Point<Pixels>>>>,
     ongoing_scroll: Option<Rc<RefCell<OngoingScroll>>>,
     pub(crate) active_tooltip: Option<Rc<RefCell<Option<ActiveTooltip>>>>,
+    pub(crate) focus_tooltip_state: Option<Rc<RefCell<FocusTooltipState>>>,
+}
+
+#[derive(Default)]
+pub(crate) struct FocusTooltipState {
+    active_focus_generation: Option<u64>,
+    dismissed_focus_generation: Option<u64>,
 }
 
 /// Whether or not the element or a group that contains it is clicked by the mouse.
@@ -3866,12 +4049,33 @@ pub(crate) fn set_tooltip_on_window(
     Some(window.set_tooltip(tooltip))
 }
 
+fn tooltip_check_visible_callback(
+    active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
+    tooltip_is_hoverable: bool,
+    check_is_active: Rc<dyn Fn(&Window) -> bool>,
+) -> Rc<dyn Fn(Bounds<Pixels>, &mut Window, &mut App) -> bool> {
+    let weak_active_tooltip = Rc::downgrade(active_tooltip);
+    Rc::new(move |tooltip_bounds, window, cx| {
+        let Some(active_tooltip) = weak_active_tooltip.upgrade() else {
+            return false;
+        };
+        handle_tooltip_check_visible_and_update(
+            &active_tooltip,
+            tooltip_is_hoverable,
+            &check_is_active,
+            tooltip_bounds,
+            window,
+            cx,
+        )
+    })
+}
+
 pub(crate) fn register_tooltip_mouse_handlers(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     tooltip_id: Option<TooltipId>,
     build_tooltip: Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>>,
     check_is_hovered: Rc<dyn Fn(&Window) -> bool>,
-    check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool>,
+    check_is_active_during_prepaint: Rc<dyn Fn(&Window) -> bool>,
     show_delay: Option<Duration>,
     window: &mut Window,
 ) {
@@ -3887,7 +4091,7 @@ pub(crate) fn register_tooltip_mouse_handlers(
                 &active_tooltip,
                 &build_tooltip,
                 &check_is_hovered,
-                &check_is_hovered_during_prepaint,
+                &check_is_active_during_prepaint,
                 tooltip_id,
                 current_view,
                 phase,
@@ -3943,7 +4147,7 @@ fn handle_tooltip_mouse_move(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     build_tooltip: &Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>>,
     check_is_hovered: &Rc<dyn Fn(&Window) -> bool>,
-    check_is_hovered_during_prepaint: &Rc<dyn Fn(&Window) -> bool>,
+    check_is_active_during_prepaint: &Rc<dyn Fn(&Window) -> bool>,
     tooltip_id: Option<TooltipId>,
     current_view: EntityId,
     phase: DispatchPhase,
@@ -4011,7 +4215,7 @@ fn handle_tooltip_mouse_move(
             let delayed_show_task = window.spawn(cx, {
                 let weak_active_tooltip = Rc::downgrade(active_tooltip);
                 let build_tooltip = build_tooltip.clone();
-                let check_is_hovered_during_prepaint = check_is_hovered_during_prepaint.clone();
+                let check_is_active_during_prepaint = Rc::clone(check_is_active_during_prepaint);
                 async move |cx| {
                     cx.background_executor().timer(show_delay).await;
                     let Some(active_tooltip) = weak_active_tooltip.upgrade() else {
@@ -4021,27 +4225,14 @@ fn handle_tooltip_mouse_move(
                         let _owner = cx.effect_owner_scope(owner);
                         let new_tooltip =
                             build_tooltip(window, cx).map(|(view, tooltip_is_hoverable)| {
-                                let weak_active_tooltip = Rc::downgrade(&active_tooltip);
                                 ActiveTooltip::Visible {
                                     tooltip: AnyTooltip {
                                         view,
                                         mouse_position: window.mouse_position(),
-                                        check_visible_and_update: Rc::new(
-                                            move |tooltip_bounds, window, cx| {
-                                                let Some(active_tooltip) =
-                                                    weak_active_tooltip.upgrade()
-                                                else {
-                                                    return false;
-                                                };
-                                                handle_tooltip_check_visible_and_update(
-                                                    &active_tooltip,
-                                                    tooltip_is_hoverable,
-                                                    &check_is_hovered_during_prepaint,
-                                                    tooltip_bounds,
-                                                    window,
-                                                    cx,
-                                                )
-                                            },
+                                        check_visible_and_update: tooltip_check_visible_callback(
+                                            &active_tooltip,
+                                            tooltip_is_hoverable,
+                                            check_is_active_during_prepaint.clone(),
                                         ),
                                     },
                                     is_hoverable: tooltip_is_hoverable,
@@ -5212,6 +5403,7 @@ mod tests {
     struct TooltipCaptureElement {
         child: AnyElement,
         captured_active_tooltip: CapturedActiveTooltip,
+        capture: bool,
     }
 
     impl IntoElement for TooltipCaptureElement {
@@ -5267,6 +5459,9 @@ mod tests {
             cx: &mut App,
         ) {
             self.child.paint(window, cx);
+            if !self.capture {
+                return;
+            }
             window.with_global_id("target".into(), |global_id, window| {
                 window.with_element_state::<InteractiveElementState, _>(
                     global_id,
@@ -5303,6 +5498,7 @@ mod tests {
                     )
                     .into_any_element(),
                 captured_active_tooltip: self.captured_active_tooltip.clone(),
+                capture: true,
             }
         }
     }
@@ -5674,6 +5870,320 @@ mod tests {
         test_app.run_until_parked();
 
         assert!(active_tooltip.borrow().is_none());
+    }
+
+    struct FocusTooltipOwner {
+        captured_active_tooltip: CapturedActiveTooltip,
+        focus: FocusHandle,
+        other_focus: FocusHandle,
+        builds: Rc<Cell<usize>>,
+        controls: Rc<FocusTooltipTestControls>,
+    }
+
+    struct FocusTooltipTestControls {
+        transform: Cell<Option<(f32, Point<Pixels>)>>,
+        mounted: Cell<bool>,
+    }
+
+    struct VisualScaleTestElement {
+        child: AnyElement,
+        controls: Rc<FocusTooltipTestControls>,
+    }
+
+    impl IntoElement for VisualScaleTestElement {
+        type Element = Self;
+
+        fn into_element(self) -> Self::Element {
+            self
+        }
+    }
+
+    impl Element for VisualScaleTestElement {
+        type RequestLayoutState = ();
+        type PrepaintState = ();
+
+        fn id(&self) -> Option<ElementId> {
+            None
+        }
+
+        fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+            None
+        }
+
+        fn request_layout(
+            &mut self,
+            _id: Option<&GlobalElementId>,
+            _inspector_id: Option<&InspectorElementId>,
+            window: &mut Window,
+            cx: &mut App,
+        ) -> (LayoutId, ()) {
+            (self.child.request_layout(window, cx), ())
+        }
+
+        fn prepaint(
+            &mut self,
+            _id: Option<&GlobalElementId>,
+            _inspector_id: Option<&InspectorElementId>,
+            _bounds: Bounds<Pixels>,
+            _request_layout: &mut (),
+            window: &mut Window,
+            cx: &mut App,
+        ) {
+            if let Some((scale, origin)) = self.controls.transform.get() {
+                window.with_visual_scale(scale, origin, |window| self.child.prepaint(window, cx));
+            } else {
+                self.child.prepaint(window, cx);
+            }
+        }
+
+        fn paint(
+            &mut self,
+            _id: Option<&GlobalElementId>,
+            _inspector_id: Option<&InspectorElementId>,
+            _bounds: Bounds<Pixels>,
+            _request_layout: &mut (),
+            _prepaint: &mut (),
+            window: &mut Window,
+            cx: &mut App,
+        ) {
+            if let Some((scale, origin)) = self.controls.transform.get() {
+                window.with_visual_scale(scale, origin, |window| self.child.paint(window, cx));
+            } else {
+                self.child.paint(window, cx);
+            }
+        }
+    }
+
+    impl Render for FocusTooltipOwner {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            let builds = self.builds.clone();
+            let content = div()
+                .size_full()
+                .when(self.controls.mounted.get(), |this| {
+                    this.child(
+                        div()
+                            .id("target")
+                            .w(px(50.))
+                            .h(px(30.))
+                            .track_focus(&self.focus)
+                            .focusable_tooltip(move |_, cx| {
+                                builds.set(builds.get() + 1);
+                                cx.new(|_| TestTooltipView).into()
+                            }),
+                    )
+                })
+                .child(
+                    div()
+                        .id("other")
+                        .track_focus(&self.other_focus)
+                        .w(px(10.))
+                        .h(px(10.)),
+                );
+            TooltipCaptureElement {
+                child: VisualScaleTestElement {
+                    child: content.into_any_element(),
+                    controls: self.controls.clone(),
+                }
+                .into_any_element(),
+                captured_active_tooltip: self.captured_active_tooltip.clone(),
+                capture: self.controls.mounted.get(),
+            }
+        }
+    }
+
+    fn setup_focus_tooltip_test(
+        scaled: bool,
+    ) -> (
+        TestAppContext,
+        AnyWindowHandle,
+        CapturedActiveTooltip,
+        FocusHandle,
+        FocusHandle,
+        Rc<Cell<usize>>,
+        Rc<FocusTooltipTestControls>,
+    ) {
+        let mut cx = TestAppContext::single();
+        let (focus, other_focus) = cx.update(|cx| (cx.focus_handle(), cx.focus_handle()));
+        let captured_active_tooltip = Rc::new(RefCell::new(None));
+        let builds = Rc::new(Cell::new(0));
+        let controls = Rc::new(FocusTooltipTestControls {
+            transform: Cell::new(scaled.then_some((1.5, Point::default()))),
+            mounted: Cell::new(true),
+        });
+        let window = cx.add_window({
+            let focus = focus.clone();
+            let other_focus = other_focus.clone();
+            let captured_active_tooltip = captured_active_tooltip.clone();
+            let builds = builds.clone();
+            let controls = controls.clone();
+            move |_, _| FocusTooltipOwner {
+                captured_active_tooltip,
+                focus,
+                other_focus,
+                builds,
+                controls,
+            }
+        });
+        let window = window.into();
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("draw focus tooltip owner");
+        (
+            cx,
+            window,
+            captured_active_tooltip,
+            focus,
+            other_focus,
+            builds,
+            controls,
+        )
+    }
+
+    #[test]
+    fn focusable_tooltip_uses_owner_bounds_and_escape_dismisses_until_blur() {
+        let (mut cx, window, captured, focus, other_focus, builds, _) =
+            setup_focus_tooltip_test(false);
+
+        focus_and_draw(&mut cx, window, &focus);
+        let active = captured
+            .borrow()
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .expect("focused owner has tooltip state");
+        let anchor = match active.borrow().as_ref() {
+            Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.mouse_position,
+            _ => panic!("focus shows help immediately"),
+        };
+        assert_eq!(anchor, point(px(0.), px(30.)));
+        assert_eq!(builds.get(), 1);
+
+        // Hovering while focused reuses the focused tooltip rather than building a second one.
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_mouse_move(point(px(10.), px(10.)), cx)
+        })
+        .expect("hover focused owner");
+        assert_eq!(builds.get(), 1);
+
+        cx.simulate_keystrokes(window, "escape");
+        assert!(active.borrow().is_none());
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("redraw dismissed focus tooltip");
+        assert!(
+            active.borrow().is_none(),
+            "paint must not reopen dismissed help"
+        );
+
+        cx.update_window(window, |_, window, cx| {
+            window.focus(&other_focus, cx);
+            window.focus(&focus, cx);
+        })
+        .expect("blur and refocus without an intervening draw");
+        cx.run_until_parked();
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("draw new focus tenure");
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::Visible { .. })
+        ));
+        assert_eq!(builds.get(), 2, "blur resets the focus-tenure dismissal");
+    }
+
+    #[test]
+    fn focusable_tooltip_reuses_hover_view_and_moves_anchor_when_focus_arrives() {
+        let (mut cx, window, captured, focus, _, builds, _) = setup_focus_tooltip_test(false);
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_mouse_move(point(px(11.), px(7.)), cx)
+        })
+        .expect("hover tooltip owner");
+        cx.dispatcher.advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+        cx.run_until_parked();
+        let active = captured
+            .borrow()
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .expect("hover owner has tooltip state");
+        assert_eq!(
+            match active.borrow().as_ref() {
+                Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.mouse_position,
+                _ => panic!("hover tooltip becomes visible after its delay"),
+            },
+            point(px(11.), px(7.))
+        );
+
+        focus_and_draw(&mut cx, window, &focus);
+        assert_eq!(builds.get(), 1, "focus reuses the visible hover tooltip");
+        assert_eq!(
+            match active.borrow().as_ref() {
+                Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.mouse_position,
+                _ => panic!("focus keeps the tooltip visible"),
+            },
+            point(px(0.), px(30.))
+        );
+    }
+
+    #[test]
+    fn focusable_tooltip_anchor_uses_displayed_bounds_under_visual_scale() {
+        let (mut cx, window, captured, focus, _, _, controls) = setup_focus_tooltip_test(true);
+        focus_and_draw(&mut cx, window, &focus);
+        let active = captured
+            .borrow()
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .expect("focused owner has tooltip state");
+        let anchor = match active.borrow().as_ref() {
+            Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.mouse_position,
+            _ => panic!("focus shows help immediately"),
+        };
+        assert_eq!(anchor, point(px(0.), px(45.)));
+
+        controls
+            .transform
+            .set(Some((2.0, point(px(-10.), px(-5.)))));
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("redraw moved and rescaled focus owner");
+        let updated_anchor = match active.borrow().as_ref() {
+            Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.mouse_position,
+            _ => panic!("focused help remains visible"),
+        };
+        assert_eq!(updated_anchor, point(px(10.), px(65.)));
+        cx.update_window(window, |_, window, _| {
+            assert_eq!(
+                window
+                    .tooltip_bounds
+                    .as_ref()
+                    .expect("focused tooltip is prepainted")
+                    .bounds
+                    .origin,
+                point(px(11.), px(66.))
+            );
+        })
+        .expect("inspect displayed tooltip placement");
+    }
+
+    #[test]
+    fn focusable_tooltip_state_is_released_when_owner_unmounts() {
+        let (mut cx, window, captured, focus, _, _, controls) = setup_focus_tooltip_test(false);
+        focus_and_draw(&mut cx, window, &focus);
+        let weak = captured
+            .borrow()
+            .clone()
+            .expect("focused owner has tooltip state");
+        let active = weak.upgrade().expect("owner retains tooltip state");
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::Visible { .. })
+        ));
+
+        controls.mounted.set(false);
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("unmount tooltip owner while retaining window");
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("retire unmounted tooltip owner state");
+        drop(active);
+        assert!(weak.upgrade().is_none());
+        cx.update_window(window, |_, window, _| {
+            assert!(window.tooltip_bounds.is_none());
+        })
+        .expect("window remains after owner unmount");
     }
 
     struct MouseDownOutOwner {

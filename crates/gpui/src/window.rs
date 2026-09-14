@@ -933,7 +933,7 @@ impl TooltipId {
 
 pub(crate) struct TooltipBounds {
     id: TooltipId,
-    bounds: Bounds<Pixels>,
+    pub(crate) bounds: Bounds<Pixels>,
 }
 
 #[derive(Clone)]

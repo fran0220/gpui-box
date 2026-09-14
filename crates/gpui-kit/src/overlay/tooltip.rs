@@ -1,12 +1,12 @@
-//! Hover-delayed help for a control that is already usable without it.
+//! Optional hover and keyboard-focus help for a control that is already usable without it.
 //!
 //! A tooltip is never actionable and never carries the only copy of something
-//! the user needs in order to act, because it cannot be reached by keyboard,
-//! by touch, or by anyone who does not hover.
+//! the user needs in order to act. [`Tooltipped::tip`] is hover-only;
+//! [`Tooltipped::help_tip`] explicitly adds immediate focus help with Escape
+//! dismissal while preserving the same semantic description.
 //!
-//! The delay, the placement, and the dismissal come from GPUI's own hover
-//! machinery ([`gpui::StatefulInteractiveElement::tooltip`]); this module supplies the
-//! themed surface it renders and the semantic node it publishes.
+//! Delay, placement, and dismissal come from GPUI's tooltip machinery; this
+//! module supplies the themed surface it renders and the semantic node it publishes.
 
 use gpui::{
     AnyView, App, AppContext as _, Context, IntoElement, ParentElement, Render, RenderOnce,
@@ -114,6 +114,23 @@ pub trait Tooltipped: gpui::StatefulInteractiveElement + Sized {
         let control = control.into();
         let text = text.into();
         self.tooltip(move |_window, cx| {
+            Tooltip::new(control.child("tooltip"), text.clone())
+                .describes(control.semantic_id())
+                .view(cx)
+        })
+    }
+
+    /// Shows one help tooltip while the control is hovered or focused.
+    ///
+    /// The control must already have a stable element id and must be focusable
+    /// for keyboard help, for example through `tab_index` or `track_focus`.
+    /// Hover keeps GPUI's normal delay, focus opens immediately, and Escape
+    /// dismisses help until focus leaves. The tooltip describes `control` in
+    /// the semantic tree.
+    fn help_tip(self, control: impl Into<Ident>, text: impl Into<SharedString>) -> Self {
+        let control = control.into();
+        let text = text.into();
+        self.focusable_tooltip(move |_window, cx| {
             Tooltip::new(control.child("tooltip"), text.clone())
                 .describes(control.semantic_id())
                 .view(cx)

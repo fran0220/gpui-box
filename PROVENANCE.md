@@ -1151,3 +1151,11 @@ Target-specific release bounds preserve native cross-thread GPU completion
 while keeping Wasm GPU resources thread-confined. The bound and native final-drop
 test are original GPUI Box work; no unsafe Send wrapper, external source or new
 dependency is introduced. Frozen import receipts remain unchanged.
+
+### Focusable tooltip lifecycle
+
+The focus-or-hover tooltip lifecycle, focus-tenure Escape dismissal and
+displayed-bounds anchor are original GPUI Box framework work. They reuse GPUI's
+existing focus, visual-transform and tooltip authorities without importing an
+implementation, adding a dependency or changing the frozen historical import
+receipt.

@@ -17,6 +17,11 @@ linux = "Framework mounted input/IME/accessibility tests, WGPU lease eviction/re
 native_acceptance = "Metal and Direct3D atlas leases and submission guards are implemented; macOS and Windows execution remains coordinator-owned and pending."
 lifetime = "Callers bound recording counts and retirement duration, dropping on completion/reinsertion/reduced motion. Final recording and frame release unpins only referenced allocations; reset invalidates all outstanding leases before reuse. Native leases remain Send + Sync for submission callbacks; Wasm leases stay thread-confined with browser GPU resources."
 
+[focusable_tooltip]
+contract = "Explicit opt-in focusable help shares one tooltip across hover and real GPUI focus. Focus opens immediately from displayed owner bounds; Escape dismisses for the current focus tenure; blur and unmount clear it. Existing hover-only tooltip behavior is unchanged."
+commands = ["cargo test -p gpui-box focusable_tooltip --lib", "cargo run -p xtask -- gate full"]
+limitations = ["Linux framework and headless evidence does not establish Metal or WARP rendering", "The owner must have stable element identity and actual focusability"]
+
 [assigned_root_layout]
 contract = "Invocation-local assigned border box overrides authored root width/height/min/max/aspect ratio; descendants reflow and authored styles return for natural measurement. Padding/border minima and device rounding determine actual size. Drawable caches assignment mode and dimensions."
 commands = ["cargo test -p gpui-box --features test-support --lib assigned_root", "cargo test -p gpui-box-kit --all-features --test flip_configuration", "cargo test -p gpui-box-kit --all-features --lib motion::flip", "python3 crates/gpui-kit/tests/flip_playback.py target/flip-playback"]

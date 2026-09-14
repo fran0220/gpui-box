@@ -204,15 +204,17 @@ pub(super) fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             row(&theme).child(
                 div()
-                    .id("scene.tooltip.host")
-                    .tip("scene.tooltip.export", "Writes the theme to a file on disk")
-                    .child(
-                        Button::new("scene.tooltip.export")
-                            .label("Export theme")
-                            .accessible_description("Writes the theme to a file on disk")
-                            .secondary()
-                            .on_click(|_, _| {}),
-                    ),
+                    .id("scene.tooltip.export")
+                    .tab_index(0)
+                    .role(gpui::Role::Button)
+                    .on_click(|_, _, _| {})
+                    .help_tip("scene.tooltip.export", "Writes the theme to a file on disk")
+                    .px_token(&theme, Space::Sm)
+                    .py_token(&theme, Space::Xs)
+                    .rounded(px(theme.radius(Radius::Control)))
+                    .border_1()
+                    .border_color(theme.colors.control_hairline)
+                    .child("Export theme"),
             ),
         )
         // Hover help only exists while a pointer rests on the control, so the
