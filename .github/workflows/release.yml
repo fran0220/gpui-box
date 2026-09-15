@@ -93,7 +93,7 @@ jobs:
       - run: cargo install cargo-cyclonedx --version 0.5.9 --locked
       - run: scripts/sync-zed/sync-zed verify
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with: { python-version: "3.13" }
       - name: Install isolated reference-analysis dependencies
         run: |
