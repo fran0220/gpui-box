@@ -25,7 +25,7 @@ jobs:
       GPUI_BOX_DEPLOY_SSH_KEY: /home/runner/.ssh/gpui-box-production
       GPUI_BOX_DEPLOY_KNOWN_HOSTS: tools/site/ops/bwg-known-hosts
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Require the deploy revision to be on origin/main
